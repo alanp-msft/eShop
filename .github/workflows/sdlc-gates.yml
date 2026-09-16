@@ -1,0 +1,141 @@
+name: SDLC Gates
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  # Produces SARIF for the pr gate. CodeQL covers .NET and TypeScript; Microsoft Security DevOps
+  # (Defender for DevOps) adds IaC, container, and dependency scanners. Add or swap tools freely;
+  # the triage step reads any SARIF 2.1 output.
+  scan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: csharp,javascript-typescript
+          build-mode: none
+      - uses: github/codeql-action/analyze@v3
+        with:
+          output: ${{ runner.temp }}/sarif/codeql
+          # Set to 'always' once GitHub Advanced Security is licensed so findings also appear in Code scanning.
+          upload: never
+      - uses: microsoft/security-devops-action@v1
+        id: msdo
+        continue-on-error: true
+      - name: Collect SARIF
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/sarif/msdo"
+          [ -n "${{ steps.msdo.outputs.sarifFile }}" ] && cp "${{ steps.msdo.outputs.sarifFile }}" "$RUNNER_TEMP/sarif/msdo/" || echo "MSDO produced no SARIF"
+          find "$RUNNER_TEMP/sarif" -name '*.sarif' -print
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sarif-${{ github.run_id }}
+          path: ${{ runner.temp }}/sarif/
+          retention-days: 30
+
+  gates:
+    needs: scan
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      # Pin these actions to commit SHAs before enabling on a customer repository.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Discover projects
+        id: projects
+        shell: bash
+        run: |
+          projects=$(ls -d .copilot-tracking/sdlc/*/ 2>/dev/null | xargs -n1 basename | tr '\n' ' ')
+          echo "list=${projects}" >> "$GITHUB_OUTPUT"
+          echo "Projects: ${projects:-none}"
+
+      - name: Download SARIF
+        if: github.event_name == 'pull_request' && needs.scan.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: sarif-${{ github.run_id }}
+          path: ${{ runner.temp }}/sarif
+
+      # Writes evidence/security-<date>.md with status pass|fail; the pr gate requires pass on the latest file.
+      # A missing scan or a missing required tool is a fail, so "no scan ran" cannot pass the gate.
+      - name: Triage scanner findings
+        if: github.event_name == 'pull_request' && steps.projects.outputs.list != ''
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/sarif"
+          for p in ${{ steps.projects.outputs.list }}; do
+            echo "::group::security triage $p"
+            node .github/skills/security-evidence/scripts/triage-sarif.ts --project "$p" --sarif "$RUNNER_TEMP/sarif" --write || echo "::error::$p has blocking security findings or a missing required scanner"
+            echo "::endgroup::"
+          done
+
+      - name: Data boundary scan (lifecycle artifacts)
+        shell: bash
+        run: node .github/skills/sdlc-gate/scripts/scan-artifacts.ts
+
+      - name: Secret scan (whole repository)
+        shell: bash
+        # Pin the image digest before enabling on a customer repository.
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 \
+            detect --source /repo --no-git --redact --exit-code 1
+
+      - name: Requirement trace
+        if: steps.projects.outputs.list != ''
+        shell: bash
+        run: |
+          set -e
+          for p in ${{ steps.projects.outputs.list }}; do
+            echo "::group::trace $p"
+            node .github/skills/requirement-trace/scripts/trace-requirements.ts --project "$p" --fail-on-orphans || echo "::warning::$p has untraced requirements"
+            echo "::endgroup::"
+          done
+
+      - name: Gate check (audited)
+        if: steps.projects.outputs.list != ''
+        shell: bash
+        env:
+          GATE: ${{ github.event_name == 'pull_request' && 'pr' || 'release' }}
+          GATE_FLAGS: ${{ github.event_name == 'pull_request' && '' || '--require-approval' }}
+          STAGE: ${{ github.event_name == 'pull_request' && 'verify' || 'release' }}
+        run: |
+          audit=.github/skills/session-audit/scripts/session-audit.ts
+          gate=.github/skills/sdlc-gate/scripts/check-gate.ts
+          out="$RUNNER_TEMP/sdlc-audit"; mkdir -p "$out"
+          status=0
+          for p in ${{ steps.projects.outputs.list }}; do
+            echo "::group::$GATE gate $p"
+            sid=$(node "$audit" --project "$p" start --agent "CI Gate Runner" --agent-version "$GITHUB_SHA" --stage "$STAGE" --operator "github-actions")
+            if node "$gate" --project "$p" --gate "$GATE" $GATE_FLAGS --json > "$out/$p-$GATE-gate.json"; then outcome=completed; else outcome=blocked; status=1; fi
+            cat "$out/$p-$GATE-gate.json"
+            node "$audit" --project "$p" artifact --session-id "$sid" --action read ".copilot-tracking/sdlc/$p/charter.md"
+            [ -f ".copilot-tracking/sdlc/$p/gates/$GATE.json" ] && node "$audit" --project "$p" artifact --session-id "$sid" --action read ".copilot-tracking/sdlc/$p/gates/$GATE.json"
+            node "$audit" --project "$p" end --session-id "$sid" --outcome "$outcome"
+            node "$audit" --project "$p" export --session-id "$sid" --output "$out/$p-$GATE-session.json"
+            echo "::endgroup::"
+          done
+          exit $status
+
+      # The audit database is gitignored, so the CI run's own record is published here for auditors.
+      - name: Publish audit manifests
+        if: always() && steps.projects.outputs.list != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdlc-audit-${{ github.run_id }}
+          path: ${{ runner.temp }}/sdlc-audit/
+          retention-days: 90

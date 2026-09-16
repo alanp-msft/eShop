@@ -69,3 +69,9 @@
 ###############################################################################
 *.pfx binary
 
+# hve4isd: gate approvals hash evidence bytes; line endings must match on every platform and in CI.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.db binary

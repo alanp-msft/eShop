@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hve4isd/schemas/session-manifest.schema.json",
+  "title": "Agent Session Manifest",
+  "description": "One record per agent session, persisted to the per-customer SQLite audit store and exportable as JSON",
+  "type": "object",
+  "required": ["session_id", "project", "agent", "host", "started_at"],
+  "properties": {
+    "session_id": { "type": "string" },
+    "project": { "type": "string" },
+    "agent": { "type": "string" },
+    "agent_version": { "type": "string" },
+    "host": { "type": "string", "enum": ["vscode", "cli", "ci"] },
+    "model": { "type": "string" },
+    "operator": { "type": "string" },
+    "stage": { "type": "string", "enum": ["intake", "discovery", "architecture", "plan", "implement", "verify", "release", "operate", "learn"] },
+    "started_at": { "type": "string" },
+    "ended_at": { "type": "string" },
+    "outcome": { "type": "string", "enum": ["completed", "abandoned", "blocked"] },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "action"],
+        "properties": {
+          "path": { "type": "string" },
+          "action": { "type": "string", "enum": ["created", "updated", "read"] },
+          "sha256": { "type": "string" }
+        }
+      }
+    },
+    "approvals": { "type": "array", "items": { "type": "string" } }
+  }
+}

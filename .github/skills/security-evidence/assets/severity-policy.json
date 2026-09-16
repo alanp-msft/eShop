@@ -1,0 +1,11 @@
+{
+  "description": "Severity mapping and blocking thresholds for scanner findings, by charter risk_tier. Severity order: critical > high > medium > low.",
+  "severity_from_score": { "critical": 9.0, "high": 7.0, "medium": 4.0 },
+  "severity_from_level": { "error": "high", "warning": "medium", "note": "low", "none": "low" },
+  "tiers": {
+    "low": { "block_at": "high", "required_tools": [], "honor_sarif_suppressions": true },
+    "medium": { "block_at": "medium", "required_tools": ["CodeQL"], "honor_sarif_suppressions": true },
+    "high": { "block_at": "medium", "required_tools": ["CodeQL"], "honor_sarif_suppressions": false }
+  },
+  "suppression_max_days": 90
+}
