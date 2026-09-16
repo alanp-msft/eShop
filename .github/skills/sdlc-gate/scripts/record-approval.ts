@@ -11,6 +11,7 @@ import { parseArgs } from "node:util";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, relative, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 
 const EXIT_SUCCESS = 0;
 const EXIT_FAILURE = 1;
@@ -21,6 +22,21 @@ const DECISIONS = ["approved", "approved_with_conditions", "rejected"];
 
 function sha256Of(path: string): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+/**
+ * An approval hash is only meaningful if every clone sees the same bytes. Refuse evidence that git
+ * would not commit (ignored) or would rewrite on checkout (working-copy line endings differ from
+ * the index), because either makes the approval read as stale everywhere but this machine.
+ */
+function gitEvidenceProblem(root: string, rel: string): string | undefined {
+  const git = (...args: string[]) => spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  if (git("rev-parse", "--is-inside-work-tree").status !== 0) return undefined;
+  if (git("check-ignore", "-q", rel).status === 0) return `${rel} is gitignored; approvals must reference committed evidence`;
+  const eol = git("ls-files", "--eol", "--", rel).stdout.trim();
+  const m = /i\/(\S+)\s+w\/(\S+)/.exec(eol);
+  if (m && m[1] !== "none" && m[2] !== "none" && m[1] !== m[2]) return `${rel} has ${m[2]} line endings in the working copy but ${m[1]} in git; run git add --renormalize and check the file out again before approving`;
+  return undefined;
 }
 
 function main(): number {
@@ -62,7 +78,13 @@ function main(): number {
       console.error(`ERROR: Evidence file not found: ${path}`);
       return EXIT_FAILURE;
     }
-    evidence.push({ artifact: name, path: relative(root, path).replaceAll("\\", "/"), sha256: sha256Of(path) });
+    const rel = relative(root, path).replaceAll("\\", "/");
+    const problem = gitEvidenceProblem(root, rel);
+    if (problem) {
+      console.error(`ERROR: ${problem}`);
+      return EXIT_FAILURE;
+    }
+    evidence.push({ artifact: name, path: rel, sha256: sha256Of(path) });
   }
 
   const record: Record<string, unknown> = {

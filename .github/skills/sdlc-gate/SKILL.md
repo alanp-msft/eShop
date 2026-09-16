@@ -117,6 +117,8 @@ When an agent is asked whether work can proceed past a gate:
 | Gate reports `not required for this risk tier` | Expected; the tier does not include that gate. Raise the tier in the charter if the customer requires it |
 | `approval: invalid`                       | The approval JSON was hand-edited; re-run `record-approval.ts`                    |
 | `approval: stale`                         | An approved file changed after the decision; the approver re-reviews and re-records |
+| `has crlf line endings in the working copy but lf in git` | The recorder refuses to hash bytes a clean checkout will not reproduce; run `git add --renormalize .` then re-check out the file (or reset a clean tree) and record again |
+| `is gitignored; approvals must reference committed evidence` | Re-include the folder in `.gitignore` (the installer block covers `sdlc/`, `plans/`, `changes/`, `reviews/`, `security-plans/`, `rai-plans/`, `sssc-plans/`) and commit the file |
 | Scan flags the sponsor's email in the charter | Pass `--allow-domain <customer-domain>`, or replace it with a role placeholder such as `{{sponsor}}` |
 | `charter: $.platforms: expected object`   | Nested keys must be indented under `platforms:`; the parser handles one nesting level |
 | `Unknown file extension ".ts"`            | Node is older than 24; upgrade. Node 22.13 to 23.x also works but prints experimental warnings |
