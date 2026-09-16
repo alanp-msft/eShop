@@ -6,6 +6,7 @@ using Asp.Versioning.Http;
 using eShop.Ordering.API.Application.Commands;
 using eShop.Ordering.API.Application.Models;
 using eShop.Ordering.API.Application.Queries;
+using MediatR;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace eShop.Ordering.FunctionalTests;
@@ -33,6 +34,19 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // REQ-008
+    [Fact(DisplayName = "REQ-008 CancelOrderCommandHandler resolves from the Ordering.API container, including TimeProvider")]
+    public void CancelOrderCommandHandlerResolvesFromContainer()
+    {
+        // WebApplicationBuilder registers no TimeProvider; without the explicit Ordering.API
+        // registration the handler fails only at the first cancel request, which unit tests cannot see.
+        using var scope = _webApplicationFactory.Services.CreateScope();
+
+        var handler = scope.ServiceProvider.GetRequiredService<IRequestHandler<CancelOrderCommand, CancelOrderResult>>();
+
+        Assert.IsType<CancelOrderCommandHandler>(handler);
     }
 
     [Fact]

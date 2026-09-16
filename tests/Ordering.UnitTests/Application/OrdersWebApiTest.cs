@@ -25,8 +25,8 @@ public class OrdersWebApiTest
     public async Task Cancel_order_with_requestId_success()
     {
         // Arrange
-        _mediatorMock.Send(Arg.Any<IdentifiedCommand<CancelOrderCommand, bool>>(), default)
-            .Returns(Task.FromResult(true));
+        _mediatorMock.Send(Arg.Any<IdentifiedCommand<CancelOrderCommand, CancelOrderResult>>(), default)
+            .Returns(Task.FromResult(CancelOrderResult.Success));
 
         // Act
         var orderServices = new OrderServices(_mediatorMock, _orderQueriesMock, _identityServiceMock, _loggerMock);
@@ -40,8 +40,8 @@ public class OrdersWebApiTest
     public async Task Cancel_order_bad_request()
     {
         // Arrange
-        _mediatorMock.Send(Arg.Any<IdentifiedCommand<CancelOrderCommand, bool>>(), default)
-            .Returns(Task.FromResult(true));
+        _mediatorMock.Send(Arg.Any<IdentifiedCommand<CancelOrderCommand, CancelOrderResult>>(), default)
+            .Returns(Task.FromResult(CancelOrderResult.Success));
 
         // Act
         var orderServices = new OrderServices(_mediatorMock, _orderQueriesMock, _identityServiceMock, _loggerMock);
@@ -157,8 +157,8 @@ public class OrdersWebApiTest
     [TestMethod]
     public async Task Cancel_order_returns_problem_when_command_fails()
     {
-        _mediatorMock.Send(Arg.Any<IdentifiedCommand<CancelOrderCommand, bool>>(), default)
-            .Returns(Task.FromResult(false));
+        _mediatorMock.Send(Arg.Any<IdentifiedCommand<CancelOrderCommand, CancelOrderResult>>(), default)
+            .Returns(Task.FromResult(CancelOrderResult.NotFound));
         var services = new OrderServices(_mediatorMock, _orderQueriesMock, _identityServiceMock, _loggerMock);
 
         var result = await OrdersApi.CancelOrderAsync(Guid.NewGuid(), new CancelOrderCommand(1), services);

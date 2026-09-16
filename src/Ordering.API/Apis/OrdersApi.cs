@@ -29,7 +29,7 @@ public static class OrdersApi
             return TypedResults.BadRequest("Empty GUID is not valid for request ID");
         }
 
-        var requestCancelOrder = new IdentifiedCommand<CancelOrderCommand, bool>(command, requestId);
+        var requestCancelOrder = new IdentifiedCommand<CancelOrderCommand, CancelOrderResult>(command, requestId);
 
         services.Logger.LogInformation(
             "Sending command: {CommandName} - {IdProperty}: {CommandId} ({@Command})",
@@ -40,7 +40,10 @@ public static class OrdersApi
 
         var commandResult = await services.Mediator.Send(requestCancelOrder);
 
-        if (!commandResult)
+        // Interim mapping pending P03-T01's full CancelOrderResult -> HTTP status mapping.
+        // AlreadyCancelled keeps its pre-P02 200 (REQ-007); every other non-success result
+        // still surfaces as 500 so this phase adds no 403/404/409 semantics.
+        if (commandResult != CancelOrderResult.Success && commandResult != CancelOrderResult.AlreadyCancelled)
         {
             return TypedResults.Problem(detail: "Cancel order failed to process.", statusCode: 500);
         }

@@ -30,6 +30,8 @@ internal static class Extensions
 
         services.AddHttpContextAccessor();
         services.AddTransient<IIdentityService, IdentityService>();
+        // REQ-008: the cancel handler stamps audit entries through TimeProvider; the host does not register one by default.
+        services.AddSingleton(TimeProvider.System);
 
         // Configure mediatR
         services.AddMediatR(cfg =>

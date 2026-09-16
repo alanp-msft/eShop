@@ -93,10 +93,10 @@ Derived objectives, with reasoning:
 
 ---
 
-### P02: Application-layer authorization, eligibility, and result type
+### P02: Application-layer authorization, eligibility, and result type — ✅ Complete (2026-09-16)
 <!-- parallelizable: false -->
 
-#### P02-T01: Introduce `CancelOrderResult` and rewrite `CancelOrderCommandHandler`
+#### P02-T01: Introduce `CancelOrderResult` and rewrite `CancelOrderCommandHandler` — ✅ Complete
 
 **Goals**: Close `T-ORDERINGAPI-001` (Critical) by enforcing ownership inside `CancelOrderCommandHandler` (ADR Option A1); make the handler the single place that decides not-found vs. forbidden vs. ineligible-status vs. already-cancelled-no-op vs. success, so `OrdersApi` and the domain method stay unchanged in their own guard responsibilities. Also records the structured, identity-correlated audit log entry for successful cancellations (REQ-008 / SEC-TEMP-7 — formerly tracked as its own phase, P04, merged here because it is a one-line addition inside the same `Handle` method and the same test file; see the P04 heading below for the merge note).
 
