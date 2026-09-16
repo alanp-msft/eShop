@@ -1,6 +1,6 @@
 {
   "project": "order-cancellation",
-  "stage": "intake",
+  "stage": "architecture",
   "risk_tier": "medium",
   "gates": {
     "design": "pending",
@@ -9,5 +9,5 @@
     "production": "not_required"
   },
   "active_task_ids": [],
-  "updated_at": "2026-09-15T23:01:49-07:00"
+  "updated_at": "2026-09-16T00:00:00+00:00"
 }
