@@ -156,7 +156,7 @@ Updated existing tests (`tests/Ordering.UnitTests/Application/OrdersWebApiTest.c
    * `CancelOrderResult.Success` → `TypedResults.Ok()` (unchanged).
    * `CancelOrderResult.AlreadyCancelled` → `TypedResults.Ok()` (same response as `Success`; the client sees a successful idempotent cancel either way — see P02-T01).
    * `CancelOrderResult.NotFound` → `TypedResults.Problem(detail: "Order not found.", statusCode: 404)`.
-   * `CancelOrderResult.Forbidden` → `TypedResults.Problem(detail: "You are not authorized to cancel this order.", statusCode: 403)`.
+   * `CancelOrderResult.Forbidden` → the **same** `TypedResults.Problem(detail: "Order not found.", statusCode: 404)` as `NotFound` (ADR amendment 2026-09-16; T-ORDERINGAPI-006). Both branches must produce byte-identical response bodies so a non-owner cannot distinguish an order they do not own from one that does not exist. Do not add a `403` branch. The handler result, audit trail, and P05 metrics keep `Forbidden` distinct.
    * `CancelOrderResult.IneligibleStatus` → `TypedResults.Problem(detail: "Order cannot be cancelled in its current status.", statusCode: 409)` (Assumption A4).
    * `CancelOrderResult.Unknown`, or any other unmatched/unexpected value (including the `default(CancelOrderResult)` that `IdentifiedCommandHandler.Handle`'s catch-all now produces when it swallows an unexpected exception) → keep the existing `500` `Problem` fallback for defense-in-depth. This is the only branch that maps to `500`; because `Unknown = 0` is no longer aliased to a named client-error result (see P02-T01 step 1), a swallowed infrastructure failure can no longer be misreported as `404 Not Found`.
 2. Keep the existing empty-`x-requestid` → `400 BadRequest<string>` branch exactly as-is.
@@ -165,7 +165,7 @@ Updated existing tests (`tests/Ordering.UnitTests/Application/OrdersWebApiTest.c
 5. Update `tests/Ordering.FunctionalTests/OrderingApiTests.cs`'s `CancelNonExistentOrderFails` (currently asserts `500 InternalServerError`; must be updated to assert `404 NotFound` once P02/P03 land) and add ownership/ineligible-status functional coverage (folded into P08 to keep this task's scope to the endpoint mapping itself; P08 owns the seeded-buyer scenarios).
 
 **Tests** (`tests/Ordering.UnitTests/Application/OrdersWebApiTest.cs`, MSTest):
-* `[TestMethod("REQ-002 CancelOrderAsync returns 403 when the command result is Forbidden")]`
+* `[TestMethod("REQ-002 CancelOrderAsync returns 404 with the not-found body when the command result is Forbidden")]` (assert status, `detail`, and `title` equal the `NotFound` response so nothing distinguishes the two)
 * `[TestMethod("REQ-001 CancelOrderAsync returns 404 when the command result is NotFound")]`
 * `[TestMethod("REQ-001 CancelOrderAsync returns 409 when the command result is IneligibleStatus")]`
 * `[TestMethod("REQ-001 CancelOrderAsync returns 200 when the command result is AlreadyCancelled")]`
@@ -260,7 +260,7 @@ This phase is no longer a separate implementation task. The prior circular seque
 
 **Details**:
 1. Add `public Task<HttpResponseMessage> CancelOrder(int orderNumber, Guid requestId)` to `OrderingService.cs`, building a `PUT` `HttpRequestMessage` to `remoteServiceBaseUrl + "cancel"` with the `x-requestid` header and a JSON body `{ orderNumber }` (matching `CancelOrderCommand`'s shape as seen by the API).
-2. Return the raw `HttpResponseMessage` (not throw on non-success) so the calling Razor component can distinguish `200` from `403`/`404`/`409` and show an appropriate message (REQ-006 only requires a confirmation on success; this plan does not require specific error-message copy for the forbidden/ineligible cases beyond "not going to crash the page," per Assumption — flag to `{{ux-owner}}` if specific error copy is desired later).
+2. Return the raw `HttpResponseMessage` (not throw on non-success) so the calling Razor component can distinguish `200` from `404`/`409` and show an appropriate message (REQ-006 only requires a confirmation on success; this plan does not require specific error-message copy for the not-found/ineligible cases beyond "not going to crash the page," per Assumption — flag to `{{ux-owner}}` if specific error copy is desired later). The API never returns `403` for a non-owner (ADR amendment 2026-09-16), so the UI has no forbidden case to render.
 
 **Tests**: none required at this layer beyond what P07-T03's bUnit component tests cover (this is a thin HTTP wrapper with no branching logic).
 
@@ -280,7 +280,7 @@ This phase is no longer a separate implementation task. The prior circular seque
 1. In `Orders.razor`, add a cancel button/link per `<li class="orders-item">` row, visible only when `order.Status` is `"Submitted"` or `"AwaitingValidation"` (string compare against the existing `OrderRecord.Status` field, matching the page's existing `@order.Status.ToLower()` usage for the status pill).
 2. Wire the action to a confirmation step (simple `confirm()`-style browser dialog or an inline confirm state toggle — follow existing WebApp UI conventions; no new component library dependency) then call `OrderingService.CancelOrder(order.OrderNumber, Guid.NewGuid())`.
 3. On a `200` response, show a success message (e.g., a dismissible banner) and either re-fetch `orders` via `OrderingService.GetOrders()` or update the specific `OrderRecord`'s status locally to `"Cancelled"` so the row re-renders without a full page reload, satisfying "without requiring a manual reload."
-4. On non-success, show a generic failure message (map `403`/`404`/`409` to short user-facing text; exact copy left to `{{ux-owner}}` review, not blocking for functional completion).
+4. On non-success, show a generic failure message (map `404`/`409` to short user-facing text; exact copy left to `{{ux-owner}}` review, not blocking for functional completion).
 5. Confirm whether `OrdersRefreshOnStatusChange.razor` (already on the page) already triggers a re-render on the `OrderStatusChangedToCancelledIntegrationEvent` WebApp-side handler; if so, the local-state update in step 3 may be redundant with the SignalR/refresh mechanism already in place — read `OrdersRefreshOnStatusChange.razor` and `OrderStatusChangedToCancelledIntegrationEventHandler.cs` at execution time to avoid double-implementing the refresh path.
 
 **Tests**: No Blazor/bUnit component test lives directly in this task; automated UI-behavior coverage for REQ-006 is provided by the new **P07-T03** (bUnit test project), which exercises this markup/wiring directly. This task's own changes are otherwise covered indirectly by P08's end-to-end API-contract test.
@@ -332,10 +332,10 @@ This phase is no longer a separate implementation task. The prior circular seque
 **Details**:
 1. Extend `OrderingApiFixture` (or add a seeding helper alongside it) to insert a `Buyer` row with `IdentityGuid = AutoAuthorizeMiddleware.IDENTITY_ID` and a second `Buyer` with a different `IdentityGuid`, plus `Order` rows owned by each, before the ownership tests run (Assumption A3). Keep seeding additive/idempotent so it does not break the existing unrelated tests in `OrderingApiTests.cs`.
 2. Update `CancelNonExistentOrderFails` to assert `404 NotFound` (was `500 InternalServerError`; this is a required fix given the P02/P03 behavior change, not new coverage).
-3. Add functional tests for: cancelling an order owned by a different buyer (`403`), cancelling an owned eligible order (`200`, and assert an `IntegrationEventLogEF` row exists for `OrderStatusChangedToCancelledIntegrationEvent` afterward — REQ-005), submitting the same `x-requestid` twice (second call returns the original `200` without a second integration-event-log row — REQ-007 scenario 1), submitting a new `x-requestid` against an order already `Cancelled` (returns `200` without adding a second integration-event-log row — REQ-007 scenario 2).
+3. Add functional tests for: cancelling an order owned by a different buyer (`404`, with a response body identical to cancelling a non-existent order number, per the ADR amendment; the order must remain unmodified), cancelling an owned eligible order (`200`, and assert an `IntegrationEventLogEF` row exists for `OrderStatusChangedToCancelledIntegrationEvent` afterward — REQ-005), submitting the same `x-requestid` twice (second call returns the original `200` without a second integration-event-log row — REQ-007 scenario 1), submitting a new `x-requestid` against an order already `Cancelled` (returns `200` without adding a second integration-event-log row — REQ-007 scenario 2).
 
 **Tests** (`tests/Ordering.FunctionalTests/OrderingApiTests.cs`, xUnit — see Assumption A2):
-* `[Fact(DisplayName = "REQ-002 Cancelling another buyer's order returns 403 Forbidden")]`
+* `[Fact(DisplayName = "REQ-002 Cancelling another buyer's order returns 404 indistinguishable from a missing order and leaves the order unchanged")]`
 * `[Fact(DisplayName = "REQ-005 Cancelling an eligible order publishes exactly one OrderStatusChangedToCancelledIntegrationEvent to the outbox")]`
 * `[Fact(DisplayName = "REQ-007 Repeating the same cancel request id returns the original success result without a second outbox entry")]`
 * `[Fact(DisplayName = "REQ-007 Cancelling an already-Cancelled order with a new request id succeeds without a second outbox entry")]`

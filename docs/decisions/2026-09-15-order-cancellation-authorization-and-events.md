@@ -1,7 +1,7 @@
 ---
 title: "Order Cancellation: Authorization and Event Delivery"
 description: "How customer-initiated order cancellation is authorized and how OrderCancelled events and stock release are delivered reliably"
-ms.date: 2026-09-15
+ms.date: 2026-09-16
 status: proposed
 ---
 
@@ -20,7 +20,7 @@ This ADR records how we close the T-ORDERINGAPI-001 gap and confirms the event-d
 
 ## Decision Drivers
 
-* **REQ-002 (must):** only the owning buyer may cancel their order; non-owners get `403`, unauthenticated callers get `401`.
+* **REQ-002 (must):** only the owning buyer may cancel their order; non-owners get `403 Forbidden` or an equivalent not-authorized result, unauthenticated callers get `401`.
 * **REQ-005 (must):** exactly one `OrderStatusChangedToCancelledIntegrationEvent` is published per successful cancellation, after the state change commits.
 * **REQ-004 (must):** stock reservation release must follow from that event, so publish reliability directly gates inventory correctness.
 * **REQ-007 (must):** repeated cancel requests (same or new `x-requestid`) must not re-execute cancellation logic or double-publish the event.
@@ -60,7 +60,9 @@ This ADR records how we close the T-ORDERINGAPI-001 gap and confirms the event-d
 
 ## Decision
 
-1. **Authorization — Option A1.** Extend `CancelOrderCommandHandler` with an ownership check rather than introducing a new command. Inject `IIdentityService`, load the order, and compare the authenticated caller's identity against the order's owning buyer before invoking `SetCancelledStatus()`. Change the handler's result to distinguish not-found, forbidden, and success (e.g., a small result enum/record instead of a bare `bool`), and update `OrdersApi.CancelOrderAsync` to map these to `404`/`403`/`401`/`200` per REQ-002. This directly remediates T-ORDERINGAPI-001 with the smallest change that reuses the existing command, route, and idempotency wrapper. A2 and A3 are rejected as over-engineering for a single, in-scope, customer-only cancellation path; A2's admin-cancellation motivation is explicitly out of scope per the charter, and A3's reusable-pipeline motivation has no second consumer today.
+1. **Authorization — Option A1.** Extend `CancelOrderCommandHandler` with an ownership check rather than introducing a new command. Inject `IIdentityService`, load the order, and compare the authenticated caller's identity against the order's owning buyer before invoking `SetCancelledStatus()`. Change the handler's result to distinguish not-found, forbidden, and success (e.g., a small result enum/record instead of a bare `bool`), and update `OrdersApi.CancelOrderAsync` to map these to `404`/`404`/`401`/`200`: the handler keeps `Forbidden` and `NotFound` distinct for audit logging and metrics, but the API returns the same `404 Not Found` response for both (amended 2026-09-16, see below). This directly remediates T-ORDERINGAPI-001 with the smallest change that reuses the existing command, route, and idempotency wrapper. A2 and A3 are rejected as over-engineering for a single, in-scope, customer-only cancellation path; A2's admin-cancellation motivation is explicitly out of scope per the charter, and A3's reusable-pipeline motivation has no second consumer today.
+
+   **Amendment (2026-09-16, P02 validation finding 5).** The handler resolves `NotFound` before the ownership check, so distinct `404` and `403` responses would let any authenticated customer probe eShop's sequential `int` order numbers and learn which orders exist (order-count enumeration; threat T-ORDERINGAPI-006 in the security plan). A customer has no legitimate need to learn that an order exists but is not theirs, and REQ-002 accepts "an equivalent not-authorized result". The API therefore returns `404` with a response body identical to the true not-found case for `Forbidden`. The distinction survives where it is needed: the handler result, the audit trail (no entry is written for forbidden attempts), and the REQ-009 rejected-versus-failed metrics.
 
 2. **Event delivery — Option B1.** Keep publishing `OrderStatusChangedToCancelledIntegrationEvent` through the existing `IntegrationEventLogEF` outbox via `OrderCancelledDomainEventHandler` → `IOrderingIntegrationEventService.AddAndSaveEventAsync`, unchanged. No new publish path is introduced. B2 is rejected because it breaks the atomicity the outbox provides and diverges from the pattern used by every sibling status-change handler.
 
@@ -72,7 +74,7 @@ This ADR records how we close the T-ORDERINGAPI-001 gap and confirms the event-d
 * `Order.SetCancelledStatus()` (or the handler immediately before calling it) gains a no-op branch for the already-`Cancelled` case; unit tests must cover this alongside the existing `Paid`/`Shipped` guard tests.
 * No changes are required to `OrderingIntegrationEventService`, `IntegrationEventLogEF`, or the RabbitMQ event bus — this decision explicitly avoids touching shared outbox/bus infrastructure.
 * T-ORDERINGAPI-001 is resolved as a blocking design-gate item; T-ORDERINGDOMAIN-002 (event lacks explicit "initiated by" identity) and T-ORDERINGDOMAIN-003 (cross-request-id race) remain open as separate, lower-severity follow-ups tracked in the security plan and are not solved by this ADR.
-* `{{tech-lead}}` should confirm the exact HTTP status mapping (`403` vs. a generic `401`/`400`) matches REQ-002's wording before implementation begins, and `{{code-owner}}` should confirm test coverage expectations for the new forbidden/no-op branches at PR gate.
+* `{{tech-lead}}` confirmed the HTTP status mapping on 2026-09-16: non-owner attempts return `404`, indistinguishable from not-found (see the Decision amendment). `{{code-owner}}` should confirm test coverage for the forbidden and no-op branches at PR gate, including a test that the forbidden and not-found response bodies are identical.
 
 ## Requirements Addressed
 
