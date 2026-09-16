@@ -1,0 +1,27 @@
+{
+  "project": "order-cancellation",
+  "gate": "plan",
+  "decision": "approved",
+  "approved_by": "alanp-msft",
+  "approved_at": "2026-09-16T15:41:37+00:00",
+  "conditions": [],
+  "evidence": [
+    {
+      "artifact": "plan",
+      "path": ".copilot-tracking/plans/2026-09-16/order-cancellation-plan.md",
+      "sha256": "207fdf07b88040997f4e19cb1d2ba817680fd06aba6b7b00308437a967d9d0cc"
+    },
+    {
+      "artifact": "plan-critique",
+      "path": ".copilot-tracking/reviews/plans/2026-09-16/order-cancellation-plan-critique.md",
+      "sha256": "08347557ae9d922ff1cfc317ae8254c5a4a56549427fa2a9170158cfb20e33a1"
+    },
+    {
+      "artifact": "design-gate",
+      "path": ".copilot-tracking/sdlc/order-cancellation/gates/design.json",
+      "sha256": "8843e9ba7d7befd76483ff2d088da9a607eb62fdd7ae5839cfbeec94d73a8286"
+    }
+  ],
+  "session_id": "d7d451681c2c",
+  "notes": "Revision 2 of the plan; critique disposition Approve. Approver is the pilot tech lead."
+}
