@@ -1,0 +1,59 @@
+{
+  "tracker": "github",
+  "items": {
+    "REQ-001": {
+      "id": "1",
+      "url": "https://github.com/alanp-msft/eShop/issues/1",
+      "hash": "940468eeea6cb3f2",
+      "synced_at": "2026-09-16"
+    },
+    "REQ-002": {
+      "id": "2",
+      "url": "https://github.com/alanp-msft/eShop/issues/2",
+      "hash": "087b5469121fb866",
+      "synced_at": "2026-09-16"
+    },
+    "REQ-003": {
+      "id": "3",
+      "url": "https://github.com/alanp-msft/eShop/issues/3",
+      "hash": "ba45fad269cc1d47",
+      "synced_at": "2026-09-16"
+    },
+    "REQ-004": {
+      "id": "4",
+      "url": "https://github.com/alanp-msft/eShop/issues/4",
+      "hash": "325477321db1b9fc",
+      "synced_at": "2026-09-16"
+    },
+    "REQ-005": {
+      "id": "5",
+      "url": "https://github.com/alanp-msft/eShop/issues/5",
+      "hash": "112d8ea851386426",
+      "synced_at": "2026-09-16"
+    },
+    "REQ-006": {
+      "id": "6",
+      "url": "https://github.com/alanp-msft/eShop/issues/6",
+      "hash": "fc85e49d4e1090e1",
+      "synced_at": "2026-09-16"
+    },
+    "REQ-007": {
+      "id": "7",
+      "url": "https://github.com/alanp-msft/eShop/issues/7",
+      "hash": "46c43f7c422248ad",
+      "synced_at": "2026-09-16"
+    },
+    "REQ-008": {
+      "id": "8",
+      "url": "https://github.com/alanp-msft/eShop/issues/8",
+      "hash": "a9a61351337ef640",
+      "synced_at": "2026-09-16"
+    },
+    "REQ-009": {
+      "id": "9",
+      "url": "https://github.com/alanp-msft/eShop/issues/9",
+      "hash": "ee5207e2e47bc58e",
+      "synced_at": "2026-09-16"
+    }
+  }
+}
