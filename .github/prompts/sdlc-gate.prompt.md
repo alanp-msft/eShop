@@ -1,7 +1,7 @@
 ---
 description: 'Check a lifecycle gate for a project, list missing artifacts, and record a human decision when the check passes - Brought to you by ISD/hve4isd'
 agent: SDLC Conductor
-argument-hint: "project=... gate={design|pr|release|production} [approve={true|false}]"
+argument-hint: "project=... gate={design|plan|pr|release|production} [approve={true|false}]"
 ---
 
 # SDLC Gate
@@ -9,7 +9,7 @@ argument-hint: "project=... gate={design|pr|release|production} [approve={true|f
 ## Inputs
 
 * ${input:project}: (Required) Project slug under `.copilot-tracking/sdlc/`.
-* ${input:gate}: (Required) Gate to check: `design`, `pr`, `release`, or `production`.
+* ${input:gate}: (Required) Gate to check: `design`, `plan`, `pr`, `release`, or `production`.
 * ${input:approve:false}: (Optional, defaults to false) When true, and the check passes, ask the named approver for a decision and record it.
 
 ## Requirements

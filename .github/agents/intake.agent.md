@@ -52,7 +52,7 @@ Derive `risk_tier`, `data_classification`, and `ai_components` from the answers 
 
 1. Open an audit session with the `session-audit` skill (`start --agent Intake --stage intake`) and keep the returned session id.
 2. Write the charter with `status: draft` and record it with `session-audit artifact --action created`.
-3. Write `.copilot-tracking/sdlc/{{project}}/state.json` with `stage: intake` and the tier. Read `tiers` in the sdlc-gate skill's `assets/gates.json`: every gate listed for the tier is `pending`, every other gate is `not_required`. For `medium` that is design, pr, and release pending and production not_required.
+3. Write `.copilot-tracking/sdlc/{{project}}/state.json` with `stage: intake` and the tier. Read `tiers` in the sdlc-gate skill's `assets/gates.json`: every gate listed for the tier is `pending`, every other gate is `not_required`. For `medium` that is design, plan, pr, and release pending and production not_required.
 4. Confirm the repository `.gitignore` excludes `.copilot-tracking/sdlc/*/audit/` while keeping `.copilot-tracking/sdlc/` tracked; propose the entries when they are missing.
 5. Present the charter for review and revise until the sponsor or user accepts it, then set `status: approved` and record the update.
 6. Close the audit session with the `session-audit` skill (`end --outcome completed`).

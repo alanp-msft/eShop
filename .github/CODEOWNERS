@@ -5,6 +5,7 @@
 
 # Gate approval records may only be merged with sign-off from the approver group.
 /.copilot-tracking/sdlc/*/gates/design.json      @{{org}}/architecture-leads
+/.copilot-tracking/sdlc/*/gates/plan.json        @{{org}}/tech-leads
 /.copilot-tracking/sdlc/*/gates/pr.json          @{{org}}/code-reviewers
 /.copilot-tracking/sdlc/*/gates/release.json     @{{org}}/release-managers
 /.copilot-tracking/sdlc/*/gates/production.json  @{{org}}/release-managers @{{org}}/sponsors

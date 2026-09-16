@@ -20,6 +20,14 @@ const EXIT_SUCCESS = 0;
 const EXIT_FAILURE = 1;
 const EXIT_ERROR = 2;
 
+const GATES_FILE = resolve(import.meta.dirname, "..", "..", "sdlc-gate", "assets", "gates.json");
+
+/** Every gate the tier requires before its final one: the manifest is what the final gate approves. */
+function gatesBeforeRelease(tier: string): string[] {
+  const tiers = (JSON.parse(readFileSync(GATES_FILE, "utf8")) as { tiers: Record<string, string[]> }).tiers;
+  return (tiers[tier] ?? ["pr", "release"]).slice(0, -1);
+}
+
 type Hashed = { path: string; sha256: string };
 type GateRef = Hashed & { gate: string; decision: string; approved_by: string; approved_at: string; conditions: string[] };
 type ReqStatus = { id: string; title: string; work_item?: string; trace: string };
@@ -68,7 +76,7 @@ function buildManifest(root: string, project: string, version: string): Manifest
   const rel = posix(root, dir);
   const charter = frontmatter(join(dir, "charter.md"));
   const tier = charter.risk_tier ?? "unknown";
-  const gatesNeeded = tier === "high" ? ["design", "pr", "release"] : tier === "medium" ? ["design", "pr"] : ["pr"];
+  const gatesNeeded = gatesBeforeRelease(tier);
   const missing: string[] = [];
 
   const gates: GateRef[] = [];

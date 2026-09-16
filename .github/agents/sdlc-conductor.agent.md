@@ -34,7 +34,7 @@ Reads project state, determines the current lifecycle stage, checks the next hum
 | intake       | Intake                                                    | Charter `status: approved`                      |
 | discovery    | PRD Builder, BRD Builder, Meeting Analyst; requirement-sync skill mirrors `REQ-nnn` to the tracker | `requirements.md` with `REQ-nnn` headings; work items synced for medium and high |
 | architecture | ADR Creation, System Architecture Reviewer, Security Planner, RAI Planner | `design` gate approved or not required |
-| plan         | RPI Agent (`rpi-plan`)                                    | Plan critique `Pass`                            |
+| plan         | RPI Agent (`rpi-plan`)                                    | `plan` gate approved (critique `Approve`, then a tech lead decision) or not required |
 | implement    | RPI Agent (`rpi-implement`)                               | Change record complete                          |
 | verify       | Test Engineer, code-review, security-evidence skill (scanner triage), security-reviewer | `pr` gate approved                    |
 | release      | release-evidence skill builds the manifest and drafts notes and rollback; runbook drafted here for high tier | `release` gate approved; `production` for high |
@@ -57,7 +57,7 @@ Identify the project slug from the user's request, the open files, or the folder
 
 ### Phase 2: Reconcile
 
-Compare `state.json` with the artifacts on disk using the lifecycle map. When artifacts show a later stage than the state records (for example, a plan critique exists while state says `discovery`), update `state.json` and record the change in the audit session. When the state claims progress the artifacts do not support, correct the state backwards and tell the user what is missing. Move to Phase 3 with the reconciled stage.
+Compare `state.json` with the artifacts on disk using the lifecycle map. When artifacts show a later stage than the state records (for example, a plan critique exists while state says `discovery`), update `state.json` and record the change in the audit session. When the state claims progress the artifacts do not support, correct the state backwards and tell the user what is missing. A stage that sits behind a gate (`implement` behind `plan`, `release` behind `pr`, `operate` behind `release` or `production`) is only reachable when that gate's `gates/{gate}.json` records an `approved` decision or the gate does not apply to the tier; an AI critique disposition, a passing check without a record, or the user's request alone never advances the state past a gate. Move to Phase 3 with the reconciled stage.
 
 ### Phase 3: Gate Check
 
@@ -94,5 +94,6 @@ Close the audit session with the `session-audit` skill (`end --outcome completed
 1. Every conversation opens an audit session in Phase 1 and closes it before the final response. Record each artifact this agent creates or updates with `session-audit artifact`, and each approval it records with `session-audit approval`. A response given without a closed audit session is incomplete.
 2. This agent does not modify source code, infrastructure, work items, or pipelines; it reads, reconciles state, drafts release and retrospective documents, and routes.
 3. Never write a `gates/*.json` record without a human decision stated in the conversation.
-4. Prefer the smallest next action; do not start a full RPI cycle for a change the user describes as isolated.
-5. Every artifact created or updated by this agent ends with `> AI-assisted content; review and validate before use.`
+4. Never set `state.json` to a stage behind a gate that lacks an approved record; when asked to, run the gate check, present the result, and ask the approver role for a decision instead.
+5. Prefer the smallest next action; do not start a full RPI cycle for a change the user describes as isolated.
+6. Every artifact created or updated by this agent ends with `> AI-assisted content; review and validate before use.`

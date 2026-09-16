@@ -40,8 +40,8 @@ Subcommands: `build` (default) and `verify`. Exit codes: 0 complete or intact, 1
 | Tier   | Gate approvals required | Evidence required                          |
 |--------|-------------------------|--------------------------------------------|
 | low    | pr                      | tests, trace                               |
-| medium | design, pr              | tests, trace, security (`pass`), workitems |
-| high   | design, pr, release     | tests, trace, security (`pass`), workitems |
+| medium | design, plan, pr        | tests, trace, security (`pass`), workitems |
+| high   | design, plan, pr, release | tests, trace, security (`pass`), workitems |
 
 Every requirement must be `traced` in the newest trace evidence. Approval decisions must start with `approved`. The manifest is still written when incomplete so the missing list can drive work; the release gate reads only the newest manifest.
 

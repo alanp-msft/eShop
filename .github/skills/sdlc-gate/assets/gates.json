@@ -2,8 +2,8 @@
   "description": "Gate definitions by risk tier. Paths are globs relative to the repository root; {project} is replaced with the project slug.",
   "tiers": {
     "low": ["pr", "release"],
-    "medium": ["design", "pr", "release"],
-    "high": ["design", "pr", "release", "production"]
+    "medium": ["design", "plan", "pr", "release"],
+    "high": ["design", "plan", "pr", "release", "production"]
   },
   "gates": {
     "design": {
@@ -18,6 +18,15 @@
         { "condition": "risk_tier in [medium, high]", "artifact": "security-plan", "glob": ".copilot-tracking/security-plans/{project}/security-plan-*.md" },
         { "condition": "risk_tier in [medium, high]", "artifact": "requirement-workitems", "glob": ".copilot-tracking/sdlc/{project}/evidence/workitems-*.md", "frontmatter": { "status": "synced" } },
         { "condition": "ai_components == true", "artifact": "rai-plan", "glob": ".copilot-tracking/rai-plans/{project}/rai-plan.md" }
+      ]
+    },
+    "plan": {
+      "purpose": "Scope, phase order, and test strategy agreed before implementation consumes budget; the AI critique informs the decision but does not make it",
+      "approver_role": "Tech lead",
+      "required": [
+        { "artifact": "design-gate", "glob": ".copilot-tracking/sdlc/{project}/gates/design.json" },
+        { "artifact": "plan", "glob": ".copilot-tracking/plans/*/*-plan.md" },
+        { "artifact": "plan-critique", "glob": ".copilot-tracking/reviews/plans/*/*-critique.md", "content": "^## Disposition:\\s*\\**(Approve|Approved|Pass)\\**\\s*$" }
       ]
     },
     "pr": {

@@ -62,6 +62,7 @@ Everything under `.copilot-tracking/sdlc/` except `audit/` is committed to the r
 * Approval records are created only by the sdlc-gate skill after a human states a decision in the conversation.
 * Never create, edit, or "fix" a `gates/*.json` file directly. If a record is wrong, the approver re-runs the recorder.
 * When a gate is rejected, write the reasons into `state.json` under `gates` and route the work back to the producing stage.
+* `state.json` advances past a gate only when that gate's record is `approved` or the gate does not apply to the tier: `implement` needs `gates/plan.json`, `release` needs `gates/pr.json`, `operate` needs `gates/release.json` (and `gates/production.json` for `high`). A plan critique disposition is an input to the `plan` gate, not a substitute for it.
 
 ## Evidence Files
 

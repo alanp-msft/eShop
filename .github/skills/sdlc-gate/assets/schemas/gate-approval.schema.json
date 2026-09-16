@@ -6,7 +6,7 @@
   "required": ["project", "gate", "decision", "approved_by", "approved_at", "evidence", "session_id"],
   "properties": {
     "project": { "type": "string" },
-    "gate": { "type": "string", "enum": ["design", "pr", "release", "production"] },
+    "gate": { "type": "string", "enum": ["design", "plan", "pr", "release", "production"] },
     "decision": { "type": "string", "enum": ["approved", "approved_with_conditions", "rejected"] },
     "approved_by": { "type": "string" },
     "approved_at": { "type": "string" },

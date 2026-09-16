@@ -12,6 +12,7 @@
       "type": "object",
       "properties": {
         "design": { "type": "string", "enum": ["not_required", "pending", "approved", "rejected"] },
+        "plan": { "type": "string", "enum": ["not_required", "pending", "approved", "rejected"] },
         "pr": { "type": "string", "enum": ["not_required", "pending", "approved", "rejected"] },
         "release": { "type": "string", "enum": ["not_required", "pending", "approved", "rejected"] },
         "production": { "type": "string", "enum": ["not_required", "pending", "approved", "rejected"] }

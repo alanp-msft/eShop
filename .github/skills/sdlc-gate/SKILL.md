@@ -1,6 +1,6 @@
 ---
 name: sdlc-gate
-description: 'Checks and records human SDLC gates (design, pr, release, production) by risk tier using artifact presence and signed approval records - Brought to you by ISD/hve4isd'
+description: 'Checks and records human SDLC gates (design, plan, pr, release, production) by risk tier using artifact presence and signed approval records - Brought to you by ISD/hve4isd'
 ---
 
 # SDLC Gate
@@ -9,13 +9,15 @@ description: 'Checks and records human SDLC gates (design, pr, release, producti
 
 Gates are the control points of the HVE4ISD lifecycle. Each gate lists the artifacts that must exist before a human can approve it, and which gates apply depends on the project's `risk_tier` from its charter. This skill checks a gate, reports what is missing, and records a human decision with hashed evidence so audits can detect drift after approval.
 
-Gate definitions live in [assets/gates.json](assets/gates.json). Artifact schemas live in [assets/schemas/](assets/schemas/). A requirement may carry a `frontmatter` object; the newest file matching its glob must then have those frontmatter values, which is how the `pr` gate requires the latest security evidence to say `status: pass`.
+Gate definitions live in [assets/gates.json](assets/gates.json). Artifact schemas live in [assets/schemas/](assets/schemas/). A requirement may carry a `frontmatter` object or a `content` regular expression; the newest file matching its glob must then satisfy them. This is how the `pr` gate requires the latest security evidence to say `status: pass`, and how the `plan` gate requires the latest plan critique to carry a `## Disposition:` of `Approve` or `Pass` rather than `Revise` or `Blocked`.
 
-| Risk tier | Gates that apply                    |
-|-----------|-------------------------------------|
-| low       | pr, release                         |
-| medium    | design, pr, release                 |
-| high      | design, pr, release, production     |
+| Risk tier | Gates that apply                         |
+|-----------|------------------------------------------|
+| low       | pr, release                              |
+| medium    | design, plan, pr, release                |
+| high      | design, plan, pr, release, production    |
+
+The `plan` gate sits between planning and implementation. Its inputs are the approved `design` record, the RPI plan, and the plan critique; the AI critique informs the tech lead's decision but never substitutes for it. Without an approved `gates/plan.json` a project must not enter the `implement` stage.
 
 ## Prerequisites
 
@@ -56,7 +58,7 @@ node scripts/scan-artifacts.ts
 | Parameter            | Required | Default | Description                                              |
 |----------------------|----------|---------|----------------------------------------------------------|
 | `--project`          | Yes      |         | Project slug under `.copilot-tracking/sdlc/`             |
-| `--gate`             | Yes      |         | `design`, `pr`, `release`, or `production`               |
+| `--gate`             | Yes      |         | `design`, `plan`, `pr`, `release`, or `production`       |
 | `--repo-root`        | No       | cwd     | Repository root used to resolve artifact globs           |
 | `--require-approval` | No       | false   | Fail unless a valid `approved*` record exists            |
 | `--json`             | No       | false   | Emit machine-readable output for CI and agents           |

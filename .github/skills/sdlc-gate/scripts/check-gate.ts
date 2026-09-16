@@ -31,7 +31,7 @@ type Schema = {
   enum?: Json[];
   pattern?: string;
 };
-type Requirement = { artifact: string; glob: string; condition?: string; frontmatter?: Record<string, string> };
+type Requirement = { artifact: string; glob: string; condition?: string; frontmatter?: Record<string, string>; content?: string };
 type Evidence = { artifact: string; path: string; sha256?: string };
 type GatesConfig = {
   tiers: Record<string, string[]>;
@@ -174,12 +174,16 @@ export function checkGate(repoRoot: string, project: string, gate: string, requi
     const pattern = req.glob.replaceAll("{project}", project);
     const matches = globSync(pattern, { cwd: repoRoot }).sort();
     if (!matches.length) { result.missing.push(`${req.artifact} (${pattern})`); continue; }
+    // Dated files sort by name; the newest one is the record that counts.
+    const latest = matches.at(-1)!;
     if (req.frontmatter) {
-      // Dated evidence files sort by name; the newest one is the record that counts.
-      const latest = matches.at(-1)!;
       const fm = readFrontmatter(join(repoRoot, latest));
       const bad = Object.entries(req.frontmatter).filter(([k, v]) => String(fm[k]) !== v);
       if (bad.length) { result.missing.push(`${req.artifact} (${latest}: ${bad.map(([k, v]) => `${k}=${String(fm[k])}, expected ${v}`).join("; ")})`); continue; }
+    }
+    if (req.content && !new RegExp(req.content, "m").test(readFileSync(join(repoRoot, latest), "utf8"))) {
+      result.missing.push(`${req.artifact} (${latest}: content does not match /${req.content}/)`);
+      continue;
     }
     result.present.push(req.artifact);
   }
@@ -224,8 +228,8 @@ function main(): number {
     },
   });
   const gate = values.gate ?? "";
-  if (!values.project || !["design", "pr", "release", "production"].includes(gate)) {
-    console.error("Usage: node check-gate.ts --project <slug> --gate {design|pr|release|production} [--repo-root <path>] [--require-approval] [--json]");
+  if (!values.project || !["design", "plan", "pr", "release", "production"].includes(gate)) {
+    console.error("Usage: node check-gate.ts --project <slug> --gate {design|plan|pr|release|production} [--repo-root <path>] [--require-approval] [--json]");
     return EXIT_ERROR;
   }
 

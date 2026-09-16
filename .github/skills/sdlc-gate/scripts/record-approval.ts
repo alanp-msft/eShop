@@ -17,7 +17,7 @@ const EXIT_SUCCESS = 0;
 const EXIT_FAILURE = 1;
 const EXIT_ERROR = 2;
 
-const GATES = ["design", "pr", "release", "production"];
+const GATES = ["design", "plan", "pr", "release", "production"];
 const DECISIONS = ["approved", "approved_with_conditions", "rejected"];
 
 function sha256Of(path: string): string {
@@ -59,7 +59,7 @@ function main(): number {
   const sessionId = values["session-id"];
   if (!project || !gate || !GATES.includes(gate) || !decision || !DECISIONS.includes(decision) || !approvedBy || !sessionId || !values.evidence!.length) {
     console.error(
-      "Usage: node record-approval.ts --project <slug> --gate {design|pr|release|production} --decision {approved|approved_with_conditions|rejected} --approved-by <identity> --session-id <audit session> --evidence name=path [--evidence ...] [--condition text] [--notes text] [--repo-root path]",
+      "Usage: node record-approval.ts --project <slug> --gate {design|plan|pr|release|production} --decision {approved|approved_with_conditions|rejected} --approved-by <identity> --session-id <audit session> --evidence name=path [--evidence ...] [--condition text] [--notes text] [--repo-root path]",
     );
     return EXIT_ERROR;
   }
