@@ -139,8 +139,14 @@ public class Order
         AddDomainEvent(new OrderShippedDomainEvent(this));
     }
 
+    // REQ-001, REQ-003
     public void SetCancelledStatus()
     {
+        if (OrderStatus == OrderStatus.Cancelled)
+        {
+            return;
+        }
+
         if (OrderStatus == OrderStatus.Paid ||
             OrderStatus == OrderStatus.Shipped)
         {

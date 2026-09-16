@@ -1,6 +1,7 @@
 ﻿namespace eShop.Ordering.UnitTests.Domain;
 
 using eShop.Ordering.Domain.AggregatesModel.OrderAggregate;
+using eShop.Ordering.Domain.Events;
 using eShop.Ordering.UnitTests.Domain;
 
 [TestClass]
@@ -174,5 +175,82 @@ public class OrderAggregateTest
         fakeOrder.RemoveDomainEvent(@fakeEvent);
         //Assert
         Assert.HasCount(expectedResult, fakeOrder.DomainEvents);
+    }
+
+    // REQ-003
+    [TestMethod("REQ-003 SetCancelledStatus transitions Submitted to Cancelled and raises OrderCancelledDomainEvent")]
+    public void SetCancelledStatus_from_Submitted_transitions_to_Cancelled_and_raises_event()
+    {
+        //Arrange
+        var address = new AddressBuilder().Build();
+        var order = new OrderBuilder(address).WithStatus(OrderStatus.Submitted).Build();
+        var eventCountBeforeCancel = order.DomainEvents.Count;
+
+        //Act
+        order.SetCancelledStatus();
+
+        //Assert
+        Assert.AreEqual(OrderStatus.Cancelled, order.OrderStatus);
+        Assert.IsTrue(order.DomainEvents.Skip(eventCountBeforeCancel).Any(e => e is OrderCancelledDomainEvent));
+    }
+
+    // REQ-003
+    [TestMethod("REQ-003 SetCancelledStatus transitions AwaitingValidation to Cancelled and raises OrderCancelledDomainEvent")]
+    public void SetCancelledStatus_from_AwaitingValidation_transitions_to_Cancelled_and_raises_event()
+    {
+        //Arrange
+        var address = new AddressBuilder().Build();
+        var order = new OrderBuilder(address).WithStatus(OrderStatus.AwaitingValidation).Build();
+        var eventCountBeforeCancel = order.DomainEvents.Count;
+
+        //Act
+        order.SetCancelledStatus();
+
+        //Assert
+        Assert.AreEqual(OrderStatus.Cancelled, order.OrderStatus);
+        Assert.IsTrue(order.DomainEvents.Skip(eventCountBeforeCancel).Any(e => e is OrderCancelledDomainEvent));
+    }
+
+    // REQ-001
+    [TestMethod("REQ-001 SetCancelledStatus throws OrderingDomainException and leaves status unchanged for Paid orders")]
+    public void SetCancelledStatus_from_Paid_throws_and_leaves_status_unchanged()
+    {
+        //Arrange
+        var address = new AddressBuilder().Build();
+        var order = new OrderBuilder(address).WithStatus(OrderStatus.Paid).Build();
+
+        //Act - Assert
+        Assert.ThrowsExactly<OrderingDomainException>(() => order.SetCancelledStatus());
+        Assert.AreEqual(OrderStatus.Paid, order.OrderStatus);
+    }
+
+    // REQ-001
+    [TestMethod("REQ-001 SetCancelledStatus throws OrderingDomainException and leaves status unchanged for Shipped orders")]
+    public void SetCancelledStatus_from_Shipped_throws_and_leaves_status_unchanged()
+    {
+        //Arrange
+        var address = new AddressBuilder().Build();
+        var order = new OrderBuilder(address).WithStatus(OrderStatus.Shipped).Build();
+
+        //Act - Assert
+        Assert.ThrowsExactly<OrderingDomainException>(() => order.SetCancelledStatus());
+        Assert.AreEqual(OrderStatus.Shipped, order.OrderStatus);
+    }
+
+    // REQ-007
+    [TestMethod("REQ-007 SetCancelledStatus is a no-op and raises no additional domain event when the order is already Cancelled")]
+    public void SetCancelledStatus_from_Cancelled_is_noop_and_raises_no_additional_event()
+    {
+        //Arrange
+        var address = new AddressBuilder().Build();
+        var order = new OrderBuilder(address).WithStatus(OrderStatus.Cancelled).Build();
+        var eventCountAfterFirstCancel = order.DomainEvents.Count;
+
+        //Act
+        order.SetCancelledStatus();
+
+        //Assert
+        Assert.AreEqual(OrderStatus.Cancelled, order.OrderStatus);
+        Assert.HasCount(eventCountAfterFirstCancel, order.DomainEvents);
     }
 }

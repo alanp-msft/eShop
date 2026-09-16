@@ -60,10 +60,10 @@ Derived objectives, with reasoning:
 
 ## Implementation Checklist
 
-### P01: Domain guard completeness (Order aggregate)
+### P01: Domain guard completeness (Order aggregate) — ✅ Complete (2026-09-16)
 <!-- parallelizable: false -->
 
-#### P01-T01: Add already-Cancelled no-op guard to `Order.SetCancelledStatus()` and complete unit coverage
+#### P01-T01: Add already-Cancelled no-op guard to `Order.SetCancelledStatus()` and complete unit coverage — ✅ Complete
 
 **Goals**: Close ADR Option C2 at the domain layer so a cancel request against an order already in `Cancelled` status is a no-op (no re-raised `OrderCancelledDomainEvent`, no status change, no exception), while the existing `Paid`/`Shipped` guard exception behavior is preserved unchanged; add the unit test coverage for all five transition cases that currently does not exist (grep of `OrderAggregateTest.cs` shows zero cancel-related tests today).
 
