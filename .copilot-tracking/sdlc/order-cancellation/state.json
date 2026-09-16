@@ -1,13 +1,13 @@
 {
   "project": "order-cancellation",
-  "stage": "architecture",
+  "stage": "plan",
   "risk_tier": "medium",
   "gates": {
-    "design": "pending",
+    "design": "approved",
     "pr": "pending",
     "release": "pending",
     "production": "not_required"
   },
   "active_task_ids": [],
-  "updated_at": "2026-09-16T00:00:00+00:00"
+  "updated_at": "2026-09-16T00:30:00+00:00"
 }
