@@ -153,4 +153,74 @@ Post-review (orchestrator, after the `TimeProvider` fix):
 
 Phase P02 is the second of eight planned phases and has no independent release; it establishes the `CancelOrderResult` type and the authorization/eligibility/audit-logging handler logic that P03 (HTTP response mapping) and P05 depend on. No later phase (P03–P08) was started in this turn.
 
+---
+
+## P03: API-layer response mapping
+
+**Related Plan**: `.copilot-tracking/plans/2026-09-16/order-cancellation-plan.md` — Phase `P03: API-layer response mapping`, task `P03-T01`.
+
+**Implementation Date**: 2026-09-16
+
+**Scope**: This addendum covers **P03 only** (task P03-T01). P01 and P02 (above) were already complete and committed; no later phase (P04–P08) was started. `tests/Ordering.FunctionalTests/OrderingApiTests.cs`'s `CancelNonExistentOrderFails` update was **not** made here — per the plan, that update (and the seeded-buyer ownership/ineligible-status functional coverage) is folded into P08.
+
+### Summary of Changes
+
+Replaced `OrdersApi.CancelOrderAsync`'s interim binary `Success`/`AlreadyCancelled` → `200`, everything-else → `500` mapping with the full `CancelOrderResult` → HTTP status mapping REQ-001/REQ-002/REQ-009 require: `Success`/`AlreadyCancelled` → `200 Ok`; `NotFound`/`Forbidden` → the identical `404 Problem` (ADR amendment 2026-09-16, T-ORDERINGAPI-006 — a non-owner cannot distinguish "not yours" from "doesn't exist"); `IneligibleStatus` → `409 Problem`; `Unknown`/any unmatched value (including the swallowed-exception `default(CancelOrderResult)`) → the existing `500 Problem` fallback. The empty-`x-requestid` `400 BadRequest<string>` branch and the `Results<Ok, BadRequest<string>, ProblemHttpResult>` return type are unchanged, since `ProblemHttpResult` already carries an arbitrary status code — no new typed-result type was needed.
+
+### Changes by Category
+
+#### Modified
+
+* `src/Ordering.API/Apis/OrdersApi.cs` — `CancelOrderAsync`: removed the interim mapping comment and its binary `if` check; replaced with a `switch` expression on `commandResult` implementing the full mapping (see Summary). Added a `// REQ-001, REQ-002, REQ-007, REQ-009` traceability comment above the switch, plus inline comments on the `NotFound or Forbidden` branch (citing the ADR amendment and T-ORDERINGAPI-006) and the fallback branch (citing REQ-009). No change to the method signature, the empty-`x-requestid` `400` branch, or the `services.Logger.LogInformation` call above it.
+* `tests/Ordering.UnitTests/Application/OrdersWebApiTest.cs`:
+  * `Cancel_order_returns_problem_when_command_fails` retargeted and renamed to `Cancel_order_returns_problem_for_unexpected_result`, now mocking `CancelOrderResult.Unknown` instead of `NotFound` (P02 validation finding 12) — proves the `500` fallback still fires for an unexpected/unmatched result, distinct from the new REQ-009 test below which specifically covers the swallowed-exception `default` value.
+  * Added `Cancel_order_returns_not_found_when_command_result_is_not_found` — `[TestMethod("REQ-001 CancelOrderAsync returns 404 when the command result is NotFound")]`.
+  * Added `Cancel_order_returns_not_found_body_when_command_result_is_forbidden` — `[TestMethod("REQ-002 CancelOrderAsync returns 404 with the not-found body when the command result is Forbidden")]` — invokes `CancelOrderAsync` once with `NotFound` and once with `Forbidden` and asserts the two `ProblemHttpResult`s have equal `StatusCode`, `ProblemDetails.Detail`, and `ProblemDetails.Title` (byte-identical body, per the plan and ADR amendment).
+  * Added `Cancel_order_returns_conflict_when_command_result_is_ineligible_status` — `[TestMethod("REQ-001 CancelOrderAsync returns 409 when the command result is IneligibleStatus")]`.
+  * Added `Cancel_order_returns_ok_when_command_result_is_already_cancelled` — `[TestMethod("REQ-001 CancelOrderAsync returns 200 when the command result is AlreadyCancelled")]`.
+  * Added `Cancel_order_returns_problem_not_not_found_when_command_result_is_unknown` — `[TestMethod("REQ-009 CancelOrderAsync returns 500, not 404, when the command result is the default/Unknown value produced by a swallowed exception")]` — mocks `default(CancelOrderResult)` and asserts `500`, explicitly asserting `AreNotEqual(404, ...)` as well, proving a swallowed exception cannot surface as a misleading `404`.
+  * `Cancel_order_with_requestId_success` and `Cancel_order_bad_request` were left unchanged (already valid against `CancelOrderResult` from P02; no rename needed per the plan).
+* `.copilot-tracking/plans/2026-09-16/order-cancellation-plan.md` — marked the `P03` and `P03-T01` headings `✅ Complete (2026-09-16)`.
+
+#### Added
+
+None (no new files; all changes are edits to existing `OrdersApi.cs` and `OrdersWebApiTest.cs`).
+
+#### Removed
+
+None.
+
+### Requirements Addressed
+
+* **REQ-001** — `NotFound` → `404`, `IneligibleStatus` → `409`, `AlreadyCancelled` → `200` are each covered by a dedicated named test.
+* **REQ-002** — `Forbidden` maps to the identical `404` response as `NotFound` (same status, detail, and title), covered by a test that directly compares both responses.
+* **REQ-007** — `AlreadyCancelled` continues to map to `200` (idempotent cancel is not surfaced as an error to the client), traceability comment added; behavior covered by the existing P02 handler tests and the new `AlreadyCancelled` → `200` API test.
+* **REQ-009** — `Unknown`/unmatched (including the swallowed-exception `default`) maps to `500`, not `404`, proven by both the retargeted `Cancel_order_returns_problem_for_unexpected_result` test and the explicit new REQ-009-tagged test.
+
+### Additional or Deviating Changes
+
+None. Implementation followed the plan's P03-T01 details and Tests list exactly: the `NotFound`/`Forbidden` branches produce the identical `Problem` call (same `detail` and default RFC-7231 `title` for `statusCode: 404`), no `403` branch was added, and `tests/Ordering.FunctionalTests/OrderingApiTests.cs` was left untouched (its `CancelNonExistentOrderFails` update is explicitly folded into P08 per the plan, not P03). **Known red test**: `CancelNonExistentOrderFails` still asserts `500 InternalServerError` and will fail the first time `Ordering.FunctionalTests` runs (CI or P08); it must be retargeted to `404` in P08. Post-validation (P03 findings 3 and 4): `Cancel_order_returns_problem_for_unexpected_result` now sends the undefined member `(CancelOrderResult)99` so it proves the discard arm independently of the REQ-009 `Unknown` test, and the REQ-002 body-identity test also compares `Type`, `Instance`, and `Extensions.Count`.
+
+### Validation
+
+Commands (run from the repository root, `NuGetAudit` disabled once for restore per the unreachable audit feed):
+
+```
+dotnet restore tests\Ordering.UnitTests -p:NuGetAudit=false
+dotnet test tests\Ordering.UnitTests --no-restore
+dotnet build src\Ordering.API --no-restore
+```
+
+Results:
+
+* `dotnet restore tests\Ordering.UnitTests -p:NuGetAudit=false`: succeeded (all projects already up-to-date for restore).
+* `dotnet test tests\Ordering.UnitTests --no-restore`: **Passed** — `total: 65, failed: 0, succeeded: 65, skipped: 0` (60 pre-existing P01/P02 executions + 5 new tests = 65; the retargeted test is not additive), duration ~2.3s. Only pre-existing `MSTEST0056` analyzer warnings (recommending `DisplayName` over the `TestMethod(string)` constructor overload) were emitted, consistent with the existing `[TestMethod("REQ-...")]` convention already used across P01/P02.
+* `dotnet build src\Ordering.API --no-restore`: **Build succeeded**, 0 Warning(s), 0 Error(s).
+
+`tests/Ordering.FunctionalTests` was not built or run — it is out of scope for P03 per the plan (its update is folded into P08) and requires Docker/Aspire, which this task does not touch.
+
+### Release Summary
+
+Phase P03 is the third of eight planned phases and has no independent release; it establishes the final `CancelOrderResult` → HTTP status contract that P07 (references the HTTP contract) and P08 (functional tests against the final contract) depend on. No later phase (P04–P08) was started in this turn.
+
 > AI-assisted content; review and validate before use.

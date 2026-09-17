@@ -142,10 +142,10 @@ Updated existing tests (`tests/Ordering.UnitTests/Application/OrdersWebApiTest.c
 
 ---
 
-### P03: API-layer response mapping
+### P03: API-layer response mapping — ✅ Complete (2026-09-16)
 <!-- parallelizable: false -->
 
-#### P03-T01: Map `CancelOrderResult` to HTTP responses in `OrdersApi.CancelOrderAsync`
+#### P03-T01: Map `CancelOrderResult` to HTTP responses in `OrdersApi.CancelOrderAsync` — ✅ Complete
 
 **Goals**: Replace the current binary `bool` → `200`/`500` mapping with a mapping that reflects REQ-001/REQ-002's required client-error semantics, without touching the unaffected `x-requestid` empty-GUID `400` path; also prove that an unexpected/swallowed exception still surfaces as `500`, not a misleading `404` (REQ-009 observability requirement — a failed attempt must remain distinguishable from a rejected one).
 
