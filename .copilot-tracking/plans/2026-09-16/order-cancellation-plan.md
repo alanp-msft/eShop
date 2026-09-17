@@ -222,10 +222,10 @@ This phase is no longer a separate implementation task. The prior circular seque
 
 ---
 
-### P06: Catalog stock-release confirmation (REQ-004)
+### P06: Catalog stock-release confirmation (REQ-004) — ✅ Complete (2026-09-16)
 <!-- parallelizable: true -->
 
-#### P06-T01: Add a Catalog.API consumer for `OrderStatusChangedToCancelledIntegrationEvent` and prove no stock drift
+#### P06-T01: Add a Catalog.API consumer for `OrderStatusChangedToCancelledIntegrationEvent` and prove no stock drift — ✅ Complete
 
 **Goals**: Give Catalog/Inventory an explicit subscriber to the cancellation event (currently none exists — only `WebApp` subscribes, for UI purposes) so the "stock-release signal" required by REQ-004 has a downstream consumer, and prove via test that cancelling a `Submitted`/`AwaitingValidation` order never changes `AvailableStock` (Assumption A1: there is nothing to release because nothing was reserved).
 

@@ -302,4 +302,87 @@ Post-validation (orchestrator, after findings 4–7): `dotnet build src\Ordering
 
 Phase P05 is independent of P06–P08 and extends only the P02 handler and its test file; it gives the production gate the error-rate/rejection-reason visibility REQ-009 requires before rollout. No later phase (P06, P07, P08) was started in this turn.
 
+---
+
+## P06: Catalog stock-release confirmation
+
+**Related Plan**: `.copilot-tracking/plans/2026-09-16/order-cancellation-plan.md` — Phase `P06: Catalog stock-release confirmation (REQ-004)`, task `P06-T01`.
+
+**Implementation Date**: 2026-09-16
+
+**Scope**: This addendum covers **P06 only** (task P06-T01). P01, P02, P03, and P05 (above) were already complete and committed; P07 and P08 were **not** started in this turn.
+
+### Summary of Changes
+
+Gave `Catalog.API` its first explicit subscriber to `OrderStatusChangedToCancelledIntegrationEvent` (previously only `WebApp` subscribed, for UI purposes). Per `Catalog.API`'s existing convention of defining its own copies of shared integration-event contracts (see `OrderStatusChangedToPaidIntegrationEvent.cs`), added a Catalog-local `OrderStatusChangedToCancelledIntegrationEvent` record (plus a local `OrderStatus` enum copy, since `Catalog.API` has no reference to `Ordering.Domain`) that mirrors `Ordering.API`'s record property-for-property, and a handler that logs receipt in the same pattern as the sibling handlers but deliberately never touches `AvailableStock`, per Assumption A1 (REQ-004): stock is only ever decremented once an order reaches `Paid`, and cancellation is only reachable from `Submitted`/`AwaitingValidation` (REQ-001), so no order that can legally reach `Cancelled` ever holds a stock reservation to release. Registered the new subscription in `Extensions.cs` alongside the two sibling registrations. Created the `tests/Catalog.UnitTests` MSTest project (none existed previously) mirroring `tests/Ordering.UnitTests`'s MSTest.Sdk conventions, with one test proving `AvailableStock` is unchanged for every seeded catalog item after the handler processes the event.
+
+### Changes by Category
+
+#### Added
+
+* `src/Catalog.API/IntegrationEvents/Events/OrderStatusChangedToCancelledIntegrationEvent.cs` — record with `OrderId` (`int`), `OrderStatus` (`OrderStatus`), `BuyerName` (`string`), `BuyerIdentityGuid` (`string`), constructor parameter order matching `src/Ordering.API/Application/IntegrationEvents/Events/OrderStatusChangedToCancelledIntegrationEvent.cs` exactly, so the RabbitMQ event bus (which routes and deserializes by type name) can materialize the payload `Ordering.API` publishes.
+* `src/Catalog.API/IntegrationEvents/Events/OrderStatus.cs` — local enum copy (`Submitted`=1 … `Cancelled`=6, `[JsonConverter(typeof(JsonStringEnumConverter))]`) mirroring `eShop.Ordering.Domain.AggregatesModel.OrderAggregate.OrderStatus`, required because the new event's `OrderStatus` property needs a type and `Catalog.API` does not reference `Ordering.Domain`.
+* `src/Catalog.API/IntegrationEvents/EventHandling/OrderStatusChangedToCancelledIntegrationEventHandler.cs` — `// REQ-004`. Implements `IIntegrationEventHandler<OrderStatusChangedToCancelledIntegrationEvent>` with the same primary-constructor `(CatalogContext, ILogger<T>)` shape as `OrderStatusChangedToPaidIntegrationEventHandler`. Logs `"Handling integration event: {IntegrationEventId} - ({@IntegrationEvent})"` and returns `Task.CompletedTask` without reading or writing `CatalogItem.AvailableStock` for any item; a code comment cites REQ-004 and Assumption A1 for why.
+* `tests/Catalog.UnitTests/Catalog.UnitTests.csproj` — new MSTest.Sdk project (`net10.0`, `OutputType Exe`, `IsPackable`/`IsPublishable` false), mirroring `tests/Ordering.UnitTests/Ordering.UnitTests.csproj`. References `NSubstitute`/`NSubstitute.Analyzers.CSharp` (existing central package versions, unchanged) plus `Microsoft.EntityFrameworkCore.InMemory` (new — see Additional/Deviating Changes) and a `ProjectReference` to `src/Catalog.API/Catalog.API.csproj`.
+* `tests/Catalog.UnitTests/GlobalUsings.cs` — global usings mirroring `Ordering.UnitTests/GlobalUsings.cs`'s conventions (MSTest, NSubstitute, `[assembly: Parallelize(Workers = 0, Scope = ExecutionScope.MethodLevel)]`), scoped to the `Catalog.API` namespaces the new test needs.
+* `tests/Catalog.UnitTests/IntegrationEvents/EventHandling/OrderStatusChangedToCancelledIntegrationEventHandlerTest.cs` — `// REQ-004`. `[TestMethod("REQ-004 Handling OrderStatusChangedToCancelledIntegrationEvent does not change AvailableStock for any catalog item")]`: seeds an EF Core in-memory `CatalogContext` with three `CatalogItem`s at different `AvailableStock` values, records stock per item, invokes the handler with a `Cancelled` event, then re-reads stock and asserts every item's `AvailableStock` is unchanged.
+
+#### Modified
+
+* `src/Catalog.API/Extensions/Extensions.cs` — `AddApplicationServices()`: added `.AddSubscription<OrderStatusChangedToCancelledIntegrationEvent, OrderStatusChangedToCancelledIntegrationEventHandler>()` to the existing `AddRabbitMqEventBus("eventbus")` subscription chain, immediately after the `OrderStatusChangedToPaidIntegrationEvent` subscription.
+* `Directory.Packages.props` — added `<PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="$(DotnetPackagesVersion)" />` under the "Version together with EF" group (see Additional/Deviating Changes for the version history).
+* `eShop.slnx` — added `<Project Path="tests/Catalog.UnitTests/Catalog.UnitTests.csproj" />` to the `/tests/` folder, alongside `Catalog.FunctionalTests`.
+
+#### Removed
+
+None.
+
+### Requirements Addressed
+
+* **REQ-004** — `Catalog.API` now has an explicit downstream subscriber for the `OrderStatusChangedToCancelledIntegrationEvent` "stock-release signal" (previously nothing in `Catalog.API` consumed it), satisfying Assumption A1's three-part interpretation: (a) the existing, unchanged `OrderStatusChangedToCancelledIntegrationEvent` (ADR Option B1) is confirmed as the signal; (b) `Catalog.API` now has a consumer that logs receipt for observability/future extensibility; (c) `OrderStatusChangedToCancelledIntegrationEventHandlerTest` proves `AvailableStock` is unchanged for every catalog item after the event is processed. Per the plan, `{{tech-lead}}` sign-off on the Assumption A1 interpretation is still required before this phase is considered fully approved; this implementation task does not substitute for that sign-off.
+
+### Additional or Deviating Changes
+
+* **`Microsoft.EntityFrameworkCore.InMemory` added to `Directory.Packages.props`**: no EF Core in-memory or SQLite provider existed there before this change (a needed package was absent, per the task's allowance to add one). The implementing agent pinned `10.0.0` because that was the only version in the offline cache; after the orchestrator reached the NuGet v2 endpoint through a temporary, uncommitted config, the pin was aligned to `$(DotnetPackagesVersion)` (`10.0.11`) like every other EF Core package in the file, restored, and verified green.
+* **Test context ignores `CatalogItem.Embedding` (orchestrator fix)**: the agent's test could not run on its host and failed on first real execution with `The 'Vector' property 'CatalogItem.Embedding' could not be mapped because the database provider does not support this type` — the production model maps `Embedding` to a pgvector `vector(384)` column, which the in-memory provider cannot represent. The test now uses a private `InMemoryCatalogContext : CatalogContext` whose `OnModelCreating` calls the base configuration and then `Ignore(ci => ci.Embedding)`; `AvailableStock` and the rest of the model are exactly as Catalog.API configures them. `[SetsRequiredMembers]` on its constructor replaces the earlier `null!` placeholder assignments for the `required` `DbSet` properties.
+* **Handler takes only `ILogger<T>`, not `CatalogContext` (P06 validation finding 1)**: the implementing agent injected `CatalogContext` for shape parity with the sibling handlers and discarded it. Both siblings use the context; a log-only consumer's true precedent is WebApp's copy of this handler, which takes only what it needs. Because `CatalogContext` is scoped (not pooled), the unused parameter would have constructed a DbContext per cancellation message. Removed; the test still seeds a context and proves `AvailableStock` is unchanged around the handler call.
+* **Test seeds via `context.Set<CatalogItem>()`, not the `CatalogContext.CatalogItems` property**: `CatalogContext`'s `DbSet` properties are declared `required`; the test context's `[SetsRequiredMembers]` constructor satisfies the compiler while EF Core populates the real `DbSet` instances during base construction. Seeding and reading go through `context.Set<CatalogItem>()`.
+
+### Validation
+
+**Environment constraint (blocks execution, not a logic issue with this change)**: `src/Catalog.API/Catalog.API.csproj` depends on `Pgvector`, `Pgvector.EntityFrameworkCore`, `CommunityToolkit.Aspire.OllamaSharp`, and `Aspire.Azure.AI.OpenAI` (pre-existing dependencies, unrelated to P06), none of which are present in the offline NuGet cache (`%USERPROFILE%\.nuget\packages`), and the configured `nuget.org` source is unreachable from this sandbox (TLS handshake failure, confirmed independently of the missing-audit-feed note in the task). This means `src/Catalog.API` — and therefore `tests/Catalog.UnitTests`, which references it — cannot be restored or built in this environment at all, regardless of the P06 changes. This was verified to be pre-existing and not caused by this task: no prior restore of `Catalog.API` existed in this sandbox (no `project.assets.json` for it before this session), and a scratch restore against a local offline feed pointed directly at the NuGet global-packages folder confirmed the four packages above are absent from the cache entirely (not merely a source-mapping or connectivity artifact for the already-cached packages).
+
+Commands run (from the repository root):
+
+```
+dotnet restore src\Catalog.API -p:NuGetAudit=false
+dotnet build src\Catalog.API --no-restore
+dotnet restore tests\Catalog.UnitTests -p:NuGetAudit=false
+dotnet test tests\Catalog.UnitTests --no-restore
+dotnet restore tests\Ordering.UnitTests -p:NuGetAudit=false
+dotnet test tests\Ordering.UnitTests --no-restore
+```
+
+Results:
+
+* `dotnet restore src\Catalog.API -p:NuGetAudit=false`: **Failed** — `NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json` (TLS handshake failure). A follow-up offline-feed probe (temporary NuGet config pointed at the local package cache only, not committed, removed after use) confirmed the underlying cause: `NU1101`/`NU1102` — `Pgvector`, `Pgvector.EntityFrameworkCore`, `CommunityToolkit.Aspire.OllamaSharp`, and `Aspire.Azure.AI.OpenAI` do not exist in the cache at any version, and `Microsoft.Extensions.ApiDescription.Server` is only cached at `9.0.0` (needs `>= 10.0.11`).
+* `dotnet build src\Catalog.API --no-restore`: **Failed** — same `NU1301`, since restore never produced a valid `project.assets.json`.
+* `dotnet restore tests\Catalog.UnitTests -p:NuGetAudit=false` / `dotnet test tests\Catalog.UnitTests --no-restore`: **Failed**, transitively, for the same reason (the project references `src/Catalog.API`).
+* `dotnet restore tests\Ordering.UnitTests -p:NuGetAudit=false`: succeeded (already up-to-date; no `Catalog.API`/`Pgvector` dependency in this project's graph).
+* `dotnet test tests\Ordering.UnitTests --no-restore`: **Passed** — `total: 71, failed: 0, succeeded: 71, skipped: 0`, confirming P06's changes (which do not touch any Ordering.* project) left the existing suite green.
+
+The new `Catalog.API`/`Catalog.UnitTests` code was reviewed manually line-by-line against the exact patterns of the existing, already-shipped handlers (`OrderStatusChangedToPaidIntegrationEventHandler`, `OrderStatusChangedToAwaitingValidationIntegrationEventHandler`) and event contracts (`OrderStatusChangedToPaidIntegrationEvent`) it mirrors, but **could not be compiled or executed in this sandbox**. `{{tech-lead}}`/CI with network access (or a pre-seeded cache containing `Pgvector`, `Pgvector.EntityFrameworkCore`, `CommunityToolkit.Aspire.OllamaSharp`, `Aspire.Azure.AI.OpenAI`) should run the six commands above before merging to confirm both the build and the new `REQ-004` test are green.
+
+**Post-review (orchestrator)**: `https://api.nuget.org/v3/index.json` is unreachable from this host but `https://www.nuget.org/api/v2` is. Using a NuGet config in `%TEMP%` (repository `nuget.config` untouched, verified with `git diff --quiet`) that maps the same `nuget` source key to the v2 endpoint:
+
+* `dotnet restore src\Catalog.API -p:NuGetAudit=false --configfile %TEMP%\nuget.v2.config`: succeeded.
+* `dotnet build src\Catalog.API --no-restore`: **Build succeeded**, 0 Error(s).
+* `dotnet test tests\Catalog.UnitTests --no-restore`: first run **failed** (1/1) on the `Embedding` `Vector` mapping (see Additional or Deviating Changes); after the test-context fix and the version alignment, **Passed** — `total: 1, failed: 0, succeeded: 1`.
+* `dotnet test tests\Ordering.UnitTests --no-restore`: **Passed** — `total: 71, failed: 0, succeeded: 71`.
+* `tests/Ordering.FunctionalTests` restored (the `Aspire.AppHost.Sdk` needs a repo-level source, so the repo `nuget.config` was swapped for the v2 config for the duration of one restore and restored byte-identical) and `dotnet build tests\Ordering.FunctionalTests --no-restore` **succeeded**, which compiles the P02 REQ-008 container-resolution Fact for the first time. Executing the functional suite still requires Docker and remains a CI or P08 item.
+
+### Release Summary
+
+Phase P06 is independent of the Ordering.API chain (P01→P02→P03→P08) and of P07 (WebApp); it can be reviewed and merged on its own once the environment/network constraint above is resolved and the new test is confirmed green. P07 and P08 were not started in this turn.
+
 > AI-assisted content; review and validate before use.
