@@ -7,7 +7,18 @@
 <SectionContent SectionName="page-header-title">Orders</SectionContent>
 <OrdersRefreshOnStatusChange />
 
+@* REQ-006: the page is statically server-rendered, so the cancel action posts named forms
+   (the same enhanced-form pattern CartPage and ItemPage use) instead of relying on @onclick. *@
+<form id="cancel-order-confirm-form" @formname="cancel-order-confirm" @onsubmit="RequestCancelConfirmation"></form>
+<form id="cancel-order-form" @formname="cancel-order" @onsubmit="CancelOrderAsync"></form>
+
 <div class="orders">
+@if (cancellationMessage is not null)
+{
+    <div class="orders-message @(cancellationSucceeded ? "orders-message-success" : "orders-message-error")" role="@(cancellationSucceeded ? "status" : "alert")" aria-live="polite">
+        <span>@cancellationMessage</span>
+    </div>
+}
 @if (orders is null)
 {
     <p class="orders-loading" role="status">Loading your orders...</p>
@@ -34,6 +45,7 @@ else
             <div>Date</div>
             <div class="total-header">Total</div>
             <div>Status</div>
+            <div>Actions</div>
         </li>
         @foreach (var order in orders)
         {
@@ -52,6 +64,31 @@ else
                         @order.Status
                     </span>
                 </div>
+                <div class="order-actions">
+                    @if (IsCancellable(order.Status))
+                    {
+                        @if (ConfirmCancelOrderNumber == order.OrderNumber)
+                        {
+                            <form method="post" data-enhance class="orders-cancel-confirm">
+                                <input type="hidden" name="_handler" value="cancel-order" />
+                                <AntiforgeryToken />
+                                <input type="hidden" name="CancelOrderNumber" value="@order.OrderNumber" />
+                                <span>Cancel this order?</span>
+                                <button type="submit" class="button button-danger" aria-label="Yes, cancel order @order.OrderNumber">Yes, cancel</button>
+                                <a class="button button-secondary" href="user/orders" aria-label="No, keep order @order.OrderNumber">No</a>
+                            </form>
+                        }
+                        else
+                        {
+                            <form method="post" data-enhance>
+                                <input type="hidden" name="_handler" value="cancel-order-confirm" />
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ConfirmCancelOrderNumber" value="@order.OrderNumber" />
+                                <button type="submit" class="button button-secondary" aria-label="Cancel order @order.OrderNumber">Cancel order</button>
+                            </form>
+                        }
+                    }
+                </div>
             </li>
         }
     </ul>
@@ -60,9 +97,54 @@ else
 
 @code {
     private OrderRecord[]? orders;
+    private string? cancellationMessage;
+    private bool cancellationSucceeded;
+
+    // Posted by the "Cancel order" form; keeps the inline confirmation open across the SSR round-trip.
+    [SupplyParameterFromForm(FormName = "cancel-order-confirm")]
+    public int? ConfirmCancelOrderNumber { get; set; }
+
+    // Posted by the "Yes, cancel" form.
+    [SupplyParameterFromForm(FormName = "cancel-order")]
+    public int? CancelOrderNumber { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         orders = await OrderingService.GetOrders();
+    }
+
+    // REQ-006: cancel action is only offered while the order is still eligible for cancellation.
+    private static bool IsCancellable(string status) =>
+        status is "Submitted" or "AwaitingValidation";
+
+    private void RequestCancelConfirmation()
+    {
+        // Nothing to do: the bound ConfirmCancelOrderNumber drives the confirmation markup.
+    }
+
+    // REQ-006: submit the cancel request and reflect the result without a manual reload.
+    private async Task CancelOrderAsync()
+    {
+        if (CancelOrderNumber is not int orderNumber)
+        {
+            return;
+        }
+
+        var response = await OrderingService.CancelOrder(orderNumber, Guid.NewGuid());
+
+        if (response.IsSuccessStatusCode)
+        {
+            cancellationSucceeded = true;
+            cancellationMessage = $"Order {orderNumber} has been cancelled.";
+
+            // The row re-renders as Cancelled in this response; OrdersRefreshOnStatusChange later
+            // refreshes from the server when the integration event arrives, converging on the same state.
+            orders = orders?.Select(o => o.OrderNumber == orderNumber ? o with { Status = "Cancelled" } : o).ToArray();
+        }
+        else
+        {
+            cancellationSucceeded = false;
+            cancellationMessage = "We couldn't cancel this order. It may no longer be eligible for cancellation.";
+        }
     }
 }

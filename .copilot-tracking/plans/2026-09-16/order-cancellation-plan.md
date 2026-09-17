@@ -249,10 +249,10 @@ This phase is no longer a separate implementation task. The prior circular seque
 
 ---
 
-### P07: WebApp cancel action and confirmation (REQ-006)
+### P07: WebApp cancel action and confirmation (REQ-006) — ✅ Complete (2026-09-17)
 <!-- parallelizable: true -->
 
-#### P07-T01: Add `OrderingService.CancelOrder` client method
+#### P07-T01: Add `OrderingService.CancelOrder` client method — ✅ Complete
 
 **Goals**: Give the Orders page a typed client call to `PUT /api/orders/cancel` with the required `x-requestid` header, mirroring the existing `CreateOrder` method's shape.
 
@@ -270,7 +270,7 @@ This phase is no longer a separate implementation task. The prior circular seque
 
 **Dependencies**: P03 (needs the final response-status contract to know what to branch on).
 
-#### P07-T02: Add cancel action and confirmation UI to the Orders page
+#### P07-T02: Add cancel action and confirmation UI to the Orders page — ✅ Complete
 
 **Goals**: Show a cancel action only for `Submitted`/`AwaitingValidation` orders; on success, show a confirmation and update the displayed status to `Cancelled` without a manual reload (REQ-006).
 
@@ -293,7 +293,7 @@ This phase is no longer a separate implementation task. The prior circular seque
 
 **Dependencies**: P07-T01.
 
-#### P07-T03: Add Ordering.WebApp bUnit tests for the cancel action
+#### P07-T03: Add Ordering.WebApp bUnit tests for the cancel action — ✅ Complete
 
 **Goals**: Give REQ-006 (a `must`-priority requirement) automated, requirement-tagged coverage of its UI-specific acceptance criteria, which are not observable from an API-only functional test (per critique Finding 3) — while following the enterprise instructions' "only run linters/builds/tests that already exist" rule by using the solution's already-adopted test tooling (MSTest.Sdk, matching `global.json`'s `"msbuild-sdks": { "MSTest.Sdk": "4.0.2" }` and `"test": { "runner": "Microsoft.Testing.Platform" }`) rather than introducing an unrelated test framework.
 

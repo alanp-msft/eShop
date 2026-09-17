@@ -385,4 +385,78 @@ The new `Catalog.API`/`Catalog.UnitTests` code was reviewed manually line-by-lin
 
 Phase P06 is independent of the Ordering.API chain (P01→P02→P03→P08) and of P07 (WebApp); it can be reviewed and merged on its own once the environment/network constraint above is resolved and the new test is confirmed green. P07 and P08 were not started in this turn.
 
+---
+
+## P07: WebApp cancel action and confirmation (REQ-006)
+
+**Related Plan**: `.copilot-tracking/plans/2026-09-16/order-cancellation-plan.md` — Phase `P07: WebApp cancel action and confirmation (REQ-006)`, tasks `P07-T01`, `P07-T02`, `P07-T03`.
+
+**Implementation Date**: 2026-09-17
+
+**Scope**: This record covers **P07 only** (all three tasks: P07-T01, P07-T02, P07-T03). P08 was not started.
+
+### Summary of Changes
+
+Added a typed `OrderingService.CancelOrder` client call, wired a cancel action with an inline (non-`confirm()`) confirmation step into the Orders page that is visible only for `Submitted`/`AwaitingValidation` orders, and added a new `tests/WebApp.UnitTests` MSTest+bUnit 2.11.3 project that renders `Orders.razor` against a stubbed `OrderingService`/fake `HttpMessageHandler` to give REQ-006 automated, requirement-tagged coverage for all three of its UI acceptance criteria. **Post-review rewrite (orchestrator)**: the implementing agent wired the action through `@onclick` handlers, which never fire in this WebApp because its pages are statically server-rendered (only `Chatbot` and `OrdersRefreshOnStatusChange` declare `@rendermode InteractiveServer`); bUnit dispatches events directly, so the tests passed against a UI that would have done nothing in a browser. The action now uses the enhanced `method="post"` named-form pattern that `CartPage`, `ItemPage`, and `Checkout` already use, and the tests submit those forms.
+
+### Changes by Category
+
+#### Added
+
+* `tests/WebApp.UnitTests/WebApp.UnitTests.csproj` — new `MSTest.Sdk` test project (net10.0, `OutputType=Exe`, central package management), mirroring `tests/Catalog.UnitTests/Catalog.UnitTests.csproj`'s shape, referencing `NSubstitute`/`NSubstitute.Analyzers.CSharp` (unused by these tests but kept for convention parity with the other unit-test projects) plus the new `bunit` package, and `ProjectReference`s `src/WebApp/WebApp.csproj`.
+* `tests/WebApp.UnitTests/GlobalUsings.cs` — global usings for `Bunit`, `Microsoft.AspNetCore.Components`, `Microsoft.AspNetCore.Components.Forms`, `Microsoft.Extensions.DependencyInjection`, `Microsoft.VisualStudio.TestTools.UnitTesting`, `eShop.WebApp.Components.Pages.User`, `eShop.WebApp.Services`, plus BCL namespaces; `[assembly: Parallelize(Workers = 0, Scope = ExecutionScope.MethodLevel)]` matching `tests/Ordering.UnitTests/GlobalUsings.cs`.
+* `tests/WebApp.UnitTests/Components/Pages/User/OrdersCancelActionTests.cs` — `OrdersCancelActionTests : BunitContext` (bUnit 2.x base class) with a private `FakeOrderingHttpMessageHandler` (returns canned `OrderRecord[]` JSON for `GET`, records the `PUT .../cancel` request's `x-requestid` header and `orderNumber` body, and returns a canned status code) fed into a real `OrderingService` instance, a `NullAntiforgeryStateProvider` so `<AntiforgeryToken />` renders, and `ComponentFactories.AddStub<OrdersRefreshOnStatusChange>()` to replace the SignalR-backed refresh component without touching production code. Because the endpoint form-mapping pipeline that populates `[SupplyParameterFromForm]` is internal to ASP.NET Core, the tests set the public bound property on `cut.Instance` and then submit the matching hidden named form, which is exactly what the SSR round-trip does. Five test methods (10 executions), display names for the three plan tests verbatim:
+  * `[TestMethod("REQ-006 Cancel action is visible only for orders with status Submitted or AwaitingValidation")]` — `[DataRow]`-driven over the six statuses.
+  * `[TestMethod("REQ-006 Pressing Cancel order shows an inline confirmation before any request is sent")]` — asserts the confirm form renders and no `PUT` was sent (added in review).
+  * `[TestMethod("REQ-006 A confirmation message is displayed after a successful cancellation")]` — submits the `cancel-order` form and asserts the success banner, exactly one `PUT`, the posted `orderNumber`, and a non-empty `x-requestid`.
+  * `[TestMethod("REQ-006 The order's displayed status updates to Cancelled without a page reload")]` — asserts the status pill reads `Cancelled`, `NavigationManager.Uri` is unchanged, and no further cancel action is offered.
+  * `[TestMethod("REQ-006 A rejected cancellation shows a failure message and leaves the status unchanged")]` — `409` from the API renders the error banner (`role="alert"`) and the status stays `Submitted` (added in review).
+  * `[TestMethod("REQ-006 The Cancel order form posts to the cancel-order-confirm handler with the order number")]` and `[TestMethod("REQ-006 The Yes, cancel form posts to the cancel-order handler with the order number")]` — assert the rendered per-row forms carry `method="post"`, an `_handler` value equal to the hidden receiver's `@formname`, and a hidden field named after the bound `[SupplyParameterFromForm]` property (via `nameof`), so a wiring typo cannot pass silently (P07 validation finding 1).
+
+#### Modified
+
+* `src/WebApp/Services/OrderingService.cs` — added `// REQ-006 public Task<HttpResponseMessage> CancelOrder(int orderNumber, Guid requestId)`: builds a `PUT` `HttpRequestMessage` to `remoteServiceBaseUrl + "cancel"`, adds the `x-requestid` header, sets a JSON body shaped like `CancelOrderCommand` (`{ orderNumber }`), and returns the raw `HttpResponseMessage` (no throw-on-failure) so the caller can branch on `200`/`404`/`409`.
+* `src/WebApp/Components/Pages/User/Orders.razor` — added an `Actions` column and two hidden named forms (`cancel-order-confirm`, `cancel-order`) bound through `[SupplyParameterFromForm(FormName = ...)]` properties `ConfirmCancelOrderNumber` and `CancelOrderNumber`. Each eligible row (`order.Status` is `"Submitted"` or `"AwaitingValidation"`) renders an enhanced `method="post"` form (`_handler` hidden input, `<AntiforgeryToken />`, order number) whose `Cancel order` submit button posts the confirm form; the re-rendered page shows the inline confirmation (`Cancel this order? [Yes, cancel] [No]`) for that order, where `Yes, cancel` posts the `cancel-order` form and `No` is a plain link back to the page. `CancelOrderAsync` calls `OrderingService.CancelOrder(orderNumber, Guid.NewGuid())`; on success it replaces that `OrderRecord` with `Status = "Cancelled"` so the row renders as cancelled in the same response, and a `role="status" aria-live="polite"` banner shows the success message; on `404`/`409` the banner shows a short generic failure message. Added `// REQ-006` comments.
+* `src/WebApp/Components/Pages/User/Orders.razor.css` — added `.order-actions`, `.orders-cancel-confirm`, `.orders-message`/`.orders-message-success`/`.orders-message-error` rules, following the existing token-based (`var(--color-*)`, `var(--text-*)`) styling conventions already used elsewhere in this file.
+* `Directory.Packages.props` — added `<PackageVersion Include="bunit" Version="2.11.3" />` (bunit 2.11.3 was confirmed present in the local NuGet cache before adding this).
+* `eShop.slnx` — added `<Project Path="tests/WebApp.UnitTests/WebApp.UnitTests.csproj" />` under the `/tests/` folder.
+* `.copilot-tracking/plans/2026-09-16/order-cancellation-plan.md` — marked `P07`, `P07-T01`, `P07-T02`, and `P07-T03` headings `✅ Complete (2026-09-17)`.
+
+### Deviations and Notes
+
+* **Static SSR, not `@onclick` (orchestrator review fix)**: `WebApp/Program.cs` maps Razor components with interactive server support, but no page component opts in; `Orders.razor` renders statically, so Blazor event handlers on it are never wired in the browser. The agent's `@onclick` implementation passed its bUnit tests (bUnit invokes handlers directly) and would have been a dead button in production. Rewritten to the repository's enhanced-form convention: `CartPage` uses the same `_handler` hidden input plus `@formname` hidden form to route a post to a named handler. The "dismiss" button on the banner was dropped because it, too, would need interactivity; the banner clears on the next navigation.
+* **Confirmation state across the round-trip**: with SSR there is no component state between requests, so the pending confirmation is carried by the posted `ConfirmCancelOrderNumber`; the confirm markup renders only in the response to that post, and `No` is a link to `user/orders`, which renders the page without it.
+* **P07 validation fixes**: `.button-danger` had no CSS rule anywhere in WebApp, so `Yes, cancel` rendered like `No`; a scoped rule using the existing `--color-danger` tokens was added to `Orders.razor.css`. Per-row buttons gained `aria-label`s naming the order (`Cancel order 12`, `Yes, cancel order 12`, `No, keep order 12`), mirroring `CartPage`. The failure banner uses `role="alert"`; the success banner keeps `role="status"`. `bunit` moved beside the other test-only packages in `Directory.Packages.props`.
+* **Open UX question for `{{ux-owner}}` (P07 validation finding 4)**: when the cancellation integration event reaches the WebApp, `OrdersRefreshOnStatusChange` calls `Nav.Refresh()`, which re-renders the page from the server and drops the success banner. Status converges (the re-fetched order is `Cancelled`) so REQ-006 is met, but on a fast bus the message may be visible only briefly. If it must persist, redirect after the cancel post to `user/orders?cancelled=N` and render the banner from the query string. Carry to the `pr` gate as a condition or accepted behavior.
+* **Coexistence of the local status update and `OrdersRefreshOnStatusChange`**: `OrdersRefreshOnStatusChange.razor` subscribes to `OrderStatusNotificationService` and, on notification, calls `Nav.Refresh()` — a full re-render/refetch driven by the WebApp-side `OrderStatusChangedToCancelledIntegrationEventHandler` once the integration event round-trips through the event bus. That path is asynchronous and depends on live infrastructure (RabbitMQ, SignalR-style buyer-id subscription), so it was **not** duplicated or edited. The `CancelOrderAsync` local status replacement renders the row as `Cancelled` in the response to the cancel post, satisfying "without requiring a manual reload" on its own. If/when the integration event later arrives, `Nav.Refresh()` simply re-fetches the (already-Cancelled) order list from the server — the two mechanisms are complementary: the local update is the fast path, the refresh is the authoritative confirmation for other tabs or sessions of the same buyer.
+* **No JS `confirm()` dialog**: per the plan's explicit preference, the confirmation is inline markup, not a native browser dialog, so P07-T03 can exercise it without JS interop shims.
+* **`bunit` package placement in `Directory.Packages.props`**: added near the top of the file (immediately before the `Asp.Versioning.Http` entries) rather than alphabetically at the end, matching the file's existing loose "grouped by version-tag comment" ordering rather than strict alphabetical order; this is cosmetic only and does not affect resolution.
+* **`NSubstitute`/`NSubstitute.Analyzers.CSharp` in `WebApp.UnitTests.csproj`**: included for structural parity with `Catalog.UnitTests.csproj` (per the task's "mirroring" instruction) even though the three P07-T03 tests use a fake `HttpMessageHandler` rather than NSubstitute mocks — `OrderingService` is a concrete class taking a concrete `HttpClient`, so substituting the handler was the natural seam; no test currently exercises the `NSubstitute` package, but removing it would diverge from the requested mirroring convention.
+
+### Validation
+
+Commands run (from the repository root):
+
+```
+dotnet restore src\WebApp\WebApp.csproj -p:NuGetAudit=false --configfile C:\Users\alanpan\AppData\Local\Temp\nuget.v2.config
+dotnet build src\WebApp\WebApp.csproj --no-restore
+dotnet restore tests\WebApp.UnitTests\WebApp.UnitTests.csproj -p:NuGetAudit=false --configfile C:\Users\alanpan\AppData\Local\Temp\nuget.v2.config
+dotnet build tests\WebApp.UnitTests\WebApp.UnitTests.csproj --no-restore
+dotnet test tests\WebApp.UnitTests\WebApp.UnitTests.csproj --no-restore
+dotnet test tests\Ordering.UnitTests\Ordering.UnitTests.csproj --no-restore
+dotnet test tests\Catalog.UnitTests\Catalog.UnitTests.csproj --no-restore
+```
+
+Results:
+
+* `dotnet restore`/`dotnet build src\WebApp\WebApp.csproj --no-restore`: **Build succeeded**, 0 Warning(s), 0 Error(s) — confirms the P07-T01/P07-T02 production changes compile.
+* `dotnet restore`/`dotnet build tests\WebApp.UnitTests\WebApp.UnitTests.csproj --no-restore`: **Build succeeded** (4 pre-existing-style analyzer warnings: `MSTEST0046`, `MSTEST0056` — style suggestions about `Assert.Contains` vs `StringAssert.Contains` and the `TestMethod(string)` overload; left as-is because the plan requires the exact `[TestMethod("REQ-006 ...")]` display-name strings character for character, which needs the string-argument overload).
+* `dotnet test tests\WebApp.UnitTests\WebApp.UnitTests.csproj --no-restore`: agent's run **Passed** `total: 8` against the `@onclick` version; after the orchestrator's SSR rewrite and the validation fixes **Passed** — `total: 12, failed: 0, succeeded: 12, skipped: 0` (6 data rows + 6 single tests).
+* `dotnet test tests\Ordering.UnitTests\Ordering.UnitTests.csproj --no-restore`: **Passed** — `total: 71, failed: 0, succeeded: 71, skipped: 0` (unchanged from P02/P05; confirms no regression from P07).
+* `dotnet test tests\Catalog.UnitTests\Catalog.UnitTests.csproj --no-restore`: **Passed** — `total: 1, failed: 0, succeeded: 1, skipped: 0` (unchanged from P06; confirms no regression from P07).
+
+### Release Summary
+
+P07 (REQ-006) is complete: `OrderingService.CancelOrder` (P07-T01), the Orders-page cancel action/confirmation/local-status-update UI (P07-T02), and the new `tests/WebApp.UnitTests` bUnit project with all three plan-specified, requirement-tagged tests passing (P07-T03) are all green, alongside `src/WebApp` building cleanly and no regressions in `Ordering.UnitTests`/`Catalog.UnitTests`. P07 is independent of P06 (already complete) and does not depend on P08; P08 (end-to-end functional coverage) was not started in this turn.
+
 > AI-assisted content; review and validate before use.
