@@ -1,9 +1,10 @@
 ﻿namespace eShop.Ordering.UnitTests.Application;
 
+using System.Diagnostics.Metrics;
 using eShop.Ordering.Domain.AggregatesModel.OrderAggregate;
 using eShop.Ordering.Domain.Seedwork;
 
-// REQ-002, REQ-008
+// REQ-002, REQ-008, REQ-009
 [TestClass]
 public class CancelOrderCommandHandlerTest
 {
@@ -12,6 +13,7 @@ public class CancelOrderCommandHandlerTest
     private readonly IBuyerRepository _buyerRepositoryMock;
     private readonly RecordingLogger _loggerMock;
     private readonly IUnitOfWork _unitOfWorkMock;
+    private readonly IMeterFactory _meterFactory;
 
     public CancelOrderCommandHandlerTest()
     {
@@ -20,12 +22,77 @@ public class CancelOrderCommandHandlerTest
         _buyerRepositoryMock = Substitute.For<IBuyerRepository>();
         _loggerMock = new RecordingLogger();
         _unitOfWorkMock = Substitute.For<IUnitOfWork>();
+        _meterFactory = new TestMeterFactory();
 
         _orderRepositoryMock.UnitOfWork.Returns(_unitOfWorkMock);
     }
 
     private CancelOrderCommandHandler CreateHandler()
-        => new(_orderRepositoryMock, _identityServiceMock, _buyerRepositoryMock, _loggerMock, TimeProvider.System);
+        => new(_orderRepositoryMock, _identityServiceMock, _buyerRepositoryMock, _loggerMock, TimeProvider.System, _meterFactory);
+
+    /// <summary>
+    /// REQ-009: minimal <see cref="IMeterFactory"/> that creates a real <see cref="Meter"/> per call
+    /// (unlike the production factory, which caches by name) so tests observe the exact instruments
+    /// the handler publishes under the shared <see cref="CancelOrderCommandHandler.MeterName"/> name.
+    /// </summary>
+    private sealed class TestMeterFactory : IMeterFactory
+    {
+        public Meter Create(MeterOptions options) => new(options);
+
+        public void Dispose()
+        {
+        }
+    }
+
+    /// <summary>
+    /// Records long-valued measurements published on <see cref="CancelOrderCommandHandler.MeterName"/>
+    /// via a <see cref="MeterListener"/>, capturing the optional "reason" tag for rejected counters.
+    /// </summary>
+    private sealed class MetricRecorder : IDisposable
+    {
+        private readonly MeterListener _listener;
+
+        public List<(string InstrumentName, long Value, IReadOnlyDictionary<string, string> Tags)> Measurements { get; } = [];
+
+        public MetricRecorder()
+        {
+            _listener = new MeterListener();
+            _listener.InstrumentPublished = (instrument, listener) =>
+            {
+                if (instrument.Meter.Name == CancelOrderCommandHandler.MeterName)
+                {
+                    listener.EnableMeasurementEvents(instrument);
+                }
+            };
+            _listener.SetMeasurementEventCallback<long>((instrument, value, tags, state) =>
+            {
+                var captured = new Dictionary<string, string>();
+                foreach (var tag in tags)
+                {
+                    captured[tag.Key] = tag.Value?.ToString();
+                }
+
+                Measurements.Add((instrument.Name, value, captured));
+            });
+            _listener.Start();
+        }
+
+        /// <summary>Asserts the recorder saw exactly one measurement, on the named instrument, with value 1 and the given tags.</summary>
+        public void AssertSingle(string instrumentName, params (string Key, string Value)[] tags)
+        {
+            Assert.HasCount(1, Measurements, "exactly one measurement across all instruments");
+            var (name, value, captured) = Measurements[0];
+            Assert.AreEqual(instrumentName, name);
+            Assert.AreEqual(1, value);
+            Assert.AreEqual(tags.Length, captured.Count);
+            foreach (var (key, expected) in tags)
+            {
+                Assert.AreEqual(expected, captured[key], $"tag {key}");
+            }
+        }
+
+        public void Dispose() => _listener.Dispose();
+    }
 
     /// <summary>
     /// Minimal <see cref="ILogger{T}"/> test double that captures the eventId and the structured
@@ -279,5 +346,133 @@ public class CancelOrderCommandHandlerTest
         Assert.IsNotNull(_loggerMock.LastState);
         Assert.AreEqual(orderNumber, _loggerMock.LastState["OrderId"]);
         Assert.AreEqual(buyerIdentity, _loggerMock.LastState["BuyerIdentity"]);
+    }
+
+    [TestMethod("REQ-009 Handle increments the succeeded counter exactly once for a successful cancellation")]
+    [DoNotParallelize]
+    public async Task Handle_IncrementsSucceededCounter_OnSuccessfulCancellation()
+    {
+        // Arrange
+        var order = CreateOrder(buyerId: 7, OrderStatus.Submitted);
+        _orderRepositoryMock.GetAsync(1).Returns(order);
+        _identityServiceMock.GetUserIdentity().Returns("owner-identity");
+        _buyerRepositoryMock.FindByIdAsync(7).Returns(new Buyer("owner-identity", "owner"));
+        _unitOfWorkMock.SaveEntitiesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(true));
+
+        using var recorder = new MetricRecorder();
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(new CancelOrderCommand(1), default);
+
+        // Assert
+        Assert.AreEqual(CancelOrderResult.Success, result);
+        recorder.AssertSingle("order_cancellations_succeeded", ("outcome", "cancelled"));
+    }
+
+    [TestMethod("REQ-009 Handle increments the succeeded counter with outcome=already_cancelled for an idempotent retry")]
+    [DoNotParallelize]
+    public async Task Handle_IncrementsSucceededCounter_WithOutcomeAlreadyCancelled_ForIdempotentRetry()
+    {
+        // Arrange
+        var order = CreateOrder(buyerId: 7, OrderStatus.Cancelled);
+        _orderRepositoryMock.GetAsync(1).Returns(order);
+        _identityServiceMock.GetUserIdentity().Returns("owner-identity");
+        _buyerRepositoryMock.FindByIdAsync(7).Returns(new Buyer("owner-identity", "owner"));
+
+        using var recorder = new MetricRecorder();
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(new CancelOrderCommand(1), default);
+
+        // Assert
+        Assert.AreEqual(CancelOrderResult.AlreadyCancelled, result);
+        recorder.AssertSingle("order_cancellations_succeeded", ("outcome", "already_cancelled"));
+    }
+
+    [TestMethod("REQ-009 Handle increments the rejected counter with reason=ineligible_status for a Paid order")]
+    [DoNotParallelize]
+    public async Task Handle_IncrementsRejectedCounter_WithReasonIneligibleStatus_ForPaidOrder()
+    {
+        // Arrange
+        var order = CreateOrder(buyerId: 7, OrderStatus.Paid);
+        _orderRepositoryMock.GetAsync(1).Returns(order);
+        _identityServiceMock.GetUserIdentity().Returns("owner-identity");
+        _buyerRepositoryMock.FindByIdAsync(7).Returns(new Buyer("owner-identity", "owner"));
+
+        using var recorder = new MetricRecorder();
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(new CancelOrderCommand(1), default);
+
+        // Assert
+        Assert.AreEqual(CancelOrderResult.IneligibleStatus, result);
+        recorder.AssertSingle("order_cancellations_rejected", ("reason", "ineligible_status"));
+    }
+
+    [TestMethod("REQ-009 Handle increments the rejected counter with reason=forbidden for a non-owner cancellation attempt")]
+    [DoNotParallelize]
+    public async Task Handle_IncrementsRejectedCounter_WithReasonForbidden_ForNonOwnerAttempt()
+    {
+        // Arrange: a non-owner attempt must still be observable via the rejected{reason=forbidden}
+        // counter since the HTTP response is now a silent 404 indistinguishable from NotFound
+        // (see .copilot-tracking/reviews/rpi/2026-09-16/order-cancellation-p03-validation.md finding 6).
+        var order = CreateOrder(buyerId: 7, OrderStatus.Submitted);
+        _orderRepositoryMock.GetAsync(1).Returns(order);
+        _identityServiceMock.GetUserIdentity().Returns("caller-identity");
+        _buyerRepositoryMock.FindByIdAsync(7).Returns(new Buyer("owner-identity", "owner"));
+
+        using var recorder = new MetricRecorder();
+        var handler = CreateHandler();
+
+        // Act
+        var result = await handler.Handle(new CancelOrderCommand(1), default);
+
+        // Assert
+        Assert.AreEqual(CancelOrderResult.Forbidden, result);
+        recorder.AssertSingle("order_cancellations_rejected", ("reason", "forbidden"));
+    }
+
+    [TestMethod("REQ-009 Handle increments the failed counter and rethrows when an unexpected exception occurs")]
+    [DoNotParallelize]
+    public async Task Handle_IncrementsFailedCounter_AndRethrows_OnUnexpectedException()
+    {
+        // Arrange
+        _orderRepositoryMock.GetAsync(Arg.Any<int>()).Returns<Task<Order>>(_ => throw new InvalidOperationException("boom"));
+
+        using var recorder = new MetricRecorder();
+        var handler = CreateHandler();
+
+        // Act & Assert
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(
+            () => handler.Handle(new CancelOrderCommand(1), default));
+
+        recorder.AssertSingle("order_cancellations_failed");
+    }
+
+    [TestMethod("REQ-009 Handle does not count a caller-cancelled request as failed")]
+    [DoNotParallelize]
+    public async Task Handle_DoesNotIncrementFailedCounter_WhenCallerCancelsRequest()
+    {
+        // Arrange
+        var order = CreateOrder(buyerId: 7, OrderStatus.Submitted);
+        _orderRepositoryMock.GetAsync(1).Returns(order);
+        _identityServiceMock.GetUserIdentity().Returns("owner-identity");
+        _buyerRepositoryMock.FindByIdAsync(7).Returns(new Buyer("owner-identity", "owner"));
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        _unitOfWorkMock.SaveEntitiesAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<bool>>(_ => throw new OperationCanceledException(cts.Token));
+
+        using var recorder = new MetricRecorder();
+        var handler = CreateHandler();
+
+        // Act & Assert
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            () => handler.Handle(new CancelOrderCommand(1), cts.Token));
+
+        Assert.IsEmpty(recorder.Measurements, "a caller-cancelled request records no measurement");
     }
 }

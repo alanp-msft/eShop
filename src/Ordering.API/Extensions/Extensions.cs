@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using OpenTelemetry.Metrics;
 
 internal static class Extensions
 {
@@ -8,6 +9,11 @@ internal static class Extensions
         
         // Add the authentication services to DI
         builder.AddDefaultAuthentication();
+
+        // REQ-009: register the CancelOrderCommandHandler's Meter so its counters are exported
+        // alongside the OpenTelemetry pipeline eShop.ServiceDefaults already configures.
+        services.AddOpenTelemetry()
+            .WithMetrics(metrics => metrics.AddMeter(CancelOrderCommandHandler.MeterName));
 
         // Pooling is disabled because of the following error:
         // Unhandled exception. System.InvalidOperationException:

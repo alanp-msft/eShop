@@ -194,10 +194,10 @@ This phase is no longer a separate implementation task. The prior circular seque
 
 ---
 
-### P05: Cancel-endpoint and event-publish telemetry (REQ-009 / SEC-TEMP-9)
+### P05: Cancel-endpoint and event-publish telemetry (REQ-009 / SEC-TEMP-9) — ✅ Complete (2026-09-16)
 <!-- parallelizable: true -->
 
-#### P05-T01: Add metrics distinguishing successful, rejected, and failed cancel attempts
+#### P05-T01: Add metrics distinguishing successful, rejected, and failed cancel attempts — ✅ Complete
 
 **Goals**: Give the production gate a way to confirm error rates and publish success before the rollout is considered fully operational (REQ-009, SEC-TEMP-9), using the existing OpenTelemetry pipeline rather than a new observability stack.
 

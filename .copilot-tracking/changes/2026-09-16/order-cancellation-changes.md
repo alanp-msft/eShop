@@ -223,4 +223,83 @@ Results:
 
 Phase P03 is the third of eight planned phases and has no independent release; it establishes the final `CancelOrderResult` → HTTP status contract that P07 (references the HTTP contract) and P08 (functional tests against the final contract) depend on. No later phase (P04–P08) was started in this turn.
 
+---
+
+## P05: Cancel-endpoint and event-publish telemetry
+
+**Related Plan**: `.copilot-tracking/plans/2026-09-16/order-cancellation-plan.md` — Phase `P05: Cancel-endpoint and event-publish telemetry (REQ-009 / SEC-TEMP-9)`, task `P05-T01`.
+
+**Implementation Date**: 2026-09-16
+
+**Scope**: This addendum covers **P05 only** (task P05-T01). P01, P02, and P03 (above) were already complete and committed; P06, P07, and P08 were **not** started in this turn.
+
+### Summary of Changes
+
+Added a `System.Diagnostics.Metrics.Meter` named `eShop.Ordering.API` (constant `CancelOrderCommandHandler.MeterName`) to `CancelOrderCommandHandler`, obtained through an injected `IMeterFactory` rather than a static `Meter` so the handler stays constructor-testable. Three `Counter<long>` instruments were added: `order_cancellations_succeeded`, `order_cancellations_rejected` (tagged `reason`: `not_found` | `forbidden` | `ineligible_status`), and `order_cancellations_failed`. Each is incremented at the corresponding `Handle` return path, and the entire method body was wrapped in a `try/catch` that increments `order_cancellations_failed` and rethrows (no swallowing) so the `failed` counter observes exceptions that `IdentifiedCommandHandler`'s upstream catch would otherwise hide from telemetry. The meter name is registered with the host's OpenTelemetry pipeline via `services.AddOpenTelemetry().WithMetrics(m => m.AddMeter(CancelOrderCommandHandler.MeterName))` added to `Ordering.API`'s own `AddApplicationServices()` — `eShop.ServiceDefaults` was not modified.
+
+### Changes by Category
+
+#### Modified
+
+* `src/Ordering.API/Application/Commands/CancelOrderCommandHandler.cs`:
+  * Added `public const string MeterName = "eShop.Ordering.API"` and three `Counter<long>` fields (`_succeededCounter`, `_rejectedCounter`, `_failedCounter`), created from an injected `IMeterFactory` in the constructor via `meterFactory.Create(MeterName)`.
+  * `Handle` now wraps its full body in `try { ... } catch { _failedCounter.Add(1); throw; }`.
+  * `NotFound` → `_rejectedCounter.Add(1, "reason": "not_found")`; `Forbidden` → `_rejectedCounter.Add(1, "reason": "forbidden")` (REQ-009 comment cites finding 6 of the P03 validation: this is the only signal that detects order-enumeration attempts now that non-owners receive the same 404 as NotFound); `IneligibleStatus` → `_rejectedCounter.Add(1, "reason": "ineligible_status")`; `Success` → `_succeededCounter.Add(1)`; `AlreadyCancelled` → `_succeededCounter.Add(1)` (see Additional/Deviating Changes for the rationale).
+  * Class-level comment updated to `// REQ-002, REQ-008, REQ-009`.
+* `src/Ordering.API/Extensions/Extensions.cs` — `AddApplicationServices()`: added `services.AddOpenTelemetry().WithMetrics(metrics => metrics.AddMeter(CancelOrderCommandHandler.MeterName));` immediately after the authentication registration, with a `// REQ-009` comment. `eShop.ServiceDefaults/Extensions.cs` was **not** touched; the existing `ConfigureOpenTelemetry()`/`WithMetrics` pipeline it configures is extended additively by this second `AddOpenTelemetry()` call (the `OpenTelemetryBuilder` accumulates configuration across calls), so both the pre-existing ASP.NET Core/HTTP/runtime instrumentation and the new `eShop.Ordering.API` meter are exported.
+* `tests/Ordering.UnitTests/Application/CancelOrderCommandHandlerTest.cs`:
+  * `CreateHandler()` now also passes an `IMeterFactory` (a private `TestMeterFactory` that creates a real `Meter` from `MeterOptions`, matching the production DI-registered factory rather than diverging with a test-only seam).
+  * Added a private `MetricRecorder` helper wrapping a `MeterListener` scoped to `instrument.Meter.Name == CancelOrderCommandHandler.MeterName`, recording `(InstrumentName, Value, Reason)` tuples for `long` measurements.
+  * Added four new tests (all `[DoNotParallelize]` because the `Meter`/`MeterListener` pair is scoped by name, matching the plan's stated risk that parallel tests recording against the same meter name can observe each other's measurements):
+    * `[TestMethod("REQ-009 Handle increments the succeeded counter exactly once for a successful cancellation")]` — plan display name, character for character.
+    * `[TestMethod("REQ-009 Handle increments the rejected counter with reason=ineligible_status for a Paid order")]` — plan display name, character for character.
+    * `[TestMethod("REQ-009 Handle increments the rejected counter with reason=forbidden for a non-owner cancellation attempt")]` — new test (not in the plan's two named examples) proving the P03 validation's finding-6 concern: a non-owner attempt still increments `rejected{reason=forbidden}` even though the HTTP layer now returns an indistinguishable `404`.
+    * `[TestMethod("REQ-009 Handle increments the failed counter and rethrows when an unexpected exception occurs")]` — new test forcing `_orderRepositoryMock.GetAsync` to throw, asserting `order_cancellations_failed` is incremented exactly once and the original exception is rethrown (via `Assert.ThrowsExactlyAsync`), not swallowed.
+  * Class-level comment updated to `// REQ-002, REQ-008, REQ-009`.
+
+#### Added
+
+None (no new files; all changes are edits to existing `CancelOrderCommandHandler.cs`, `Extensions.cs`, and `CancelOrderCommandHandlerTest.cs`).
+
+#### Removed
+
+None.
+
+### Requirements Addressed
+
+* **REQ-009** — the cancel handler now emits `order_cancellations_succeeded`, `order_cancellations_rejected{reason}`, and `order_cancellations_failed` counters on the `eShop.Ordering.API` meter, registered with the host's OpenTelemetry metrics pipeline, distinguishing successful, rejected, and failed cancel attempts as the acceptance criterion requires. Covered by four named tests (two from the plan verbatim, plus the forbidden-reason and failed-counter tests this task adds per the task instructions).
+
+### Additional or Deviating Changes
+
+* **`AlreadyCancelled` counted as succeeded, not uncounted or rejected**: the plan's Details section says only "increment the counters at each corresponding return path"; the orchestrator's task instructions asked the implementer to decide how to count this path and not to count it as rejected. `AlreadyCancelled` is counted as `succeeded` because, from the caller's and the production gate's perspective, the order ends up (or already is) cancelled with no error, matching REQ-007's framing of the idempotent retry as a non-error outcome. Post-validation (P05 finding 4): the succeeded counter now carries an `outcome` tag (`cancelled` | `already_cancelled`) so the gate can reconcile fresh cancellations against outbox publishes without a fourth instrument.
+* **`IMeterFactory` over a static `Meter`**: the plan's Details step 1 said "Add a `Meter`…" without mandating the acquisition mechanism; the orchestrator's task instructions preferred `IMeterFactory` for testability and ASP.NET Core convention alignment, so the constructor takes `IMeterFactory` and calls `Create(MeterName)`, and tests supply a small `TestMeterFactory` that creates a real `Meter` via `MeterOptions` (not a mock). The orchestrator confirmed with a minimal `WebApplication.CreateBuilder().Build()` host that `IMeterFactory` is registered by default, unlike `TimeProvider` in P02.
+* **Caller cancellation excluded from `failed` (P05 finding 5)**: `catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)` rethrows without counting, so a client disconnect is not reported as a server error. Covered by `REQ-009 Handle does not count a caller-cancelled request as failed`.
+* **Known limitation (P05 finding 3)**: `order_cancellations_succeeded` is incremented when the handler reaches its success path. `TransactionBehavior` commits the transaction and dispatches the outbox after the handler returns, so a commit failure is thrown outside the handler's `catch` and is neither counted as `failed` nor subtracted from `succeeded`; if the Npgsql execution strategy retries the pipeline, a transient commit failure can double-count `succeeded`. `succeeded` therefore means "handler reached success", not "committed and published". Publish health remains observable through the existing outbox and event-bus telemetry (plan step 4). A follow-up could count `failed` in a pipeline behavior.
+* **Registration approach**: the plan's Details step 3 suggested `AddOpenTelemetry().WithMetrics(m => m.AddMeter(...))` "in the Ordering.API service registration (`Extensions/Extensions.cs`…)"; that call was added exactly as written to `AddApplicationServices()`. No `Program.cs` change was needed or made.
+* No package references were added; `System.Diagnostics.Metrics.IMeterFactory`/`MeterOptions` and `Counter<long>` are available in the shared framework already referenced by the `Microsoft.NET.Sdk.Web`-based `Ordering.API` project (confirmed via a scratch console probe before use, since neither type appeared in the project's global-usings list).
+
+### Validation
+
+Commands (run from the repository root, `NuGetAudit` disabled once for restore per the unreachable audit feed):
+
+```
+dotnet restore tests\Ordering.UnitTests -p:NuGetAudit=false
+dotnet test tests\Ordering.UnitTests --no-restore
+dotnet build src\Ordering.API --no-restore
+```
+
+Results:
+
+* `dotnet restore tests\Ordering.UnitTests -p:NuGetAudit=false`: succeeded (all projects already up-to-date for restore).
+* `dotnet test tests\Ordering.UnitTests --no-restore`: **Passed** — `total: 69, failed: 0, succeeded: 69, skipped: 0` (65 pre-existing P01/P02/P03 executions + 4 new REQ-009 tests = 69).
+* `dotnet build src\Ordering.API --no-restore`: **Build succeeded**, 0 Warning(s), 0 Error(s).
+
+`tests/Ordering.FunctionalTests` was not built or run — out of scope for P05 (no functional-test task in this phase) and requires Docker/Aspire, which this task does not touch. `git status --short` after implementation lists the three source files this addendum names (`CancelOrderCommandHandler.cs`, `Extensions.cs`, `CancelOrderCommandHandlerTest.cs`) plus the plan (headings marked complete) and this change record.
+
+Post-validation (orchestrator, after findings 4–7): `dotnet build src\Ordering.API --no-restore` succeeded; `dotnet test tests\Ordering.UnitTests --no-restore` **Passed** — `total: 71, failed: 0, succeeded: 71` (69 + the `already_cancelled` outcome test + the caller-cancellation test). Every metrics test now asserts exactly one measurement across all instruments with the exact tag set.
+
+### Release Summary
+
+Phase P05 is independent of P06–P08 and extends only the P02 handler and its test file; it gives the production gate the error-rate/rejection-reason visibility REQ-009 requires before rollout. No later phase (P06, P07, P08) was started in this turn.
+
 > AI-assisted content; review and validate before use.
