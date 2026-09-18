@@ -14,6 +14,8 @@ on:
       - 'src/ClientApp/**'
       - 'tests/ClientApp.UnitTests/**'
       - '.github/workflows/pr-validation-maui.yml'
+permissions:
+  contents: read
 jobs:
   test:
     timeout-minutes: 60
