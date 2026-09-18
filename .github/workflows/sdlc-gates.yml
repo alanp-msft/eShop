@@ -113,7 +113,8 @@ jobs:
         shell: bash
         env:
           GATE: ${{ github.event_name == 'pull_request' && 'pr' || 'release' }}
-          GATE_FLAGS: ${{ github.event_name == 'pull_request' && '' || '--require-approval' }}
+          # An empty string is falsy in expressions, so the non-empty value must be the && branch.
+          GATE_FLAGS: ${{ github.event_name != 'pull_request' && '--require-approval' || '' }}
           STAGE: ${{ github.event_name == 'pull_request' && 'verify' || 'release' }}
         run: |
           audit=.github/skills/session-audit/scripts/session-audit.ts
