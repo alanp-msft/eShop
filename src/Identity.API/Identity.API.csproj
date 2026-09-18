@@ -46,8 +46,8 @@
   </ItemGroup>
   
   <ItemGroup>
-    <!-- Don't use this in production -->
-    <Content Include="tempkey.jwk" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Don't use this in production. The developer signing key is generated on first run and is not committed. -->
+    <Content Include="tempkey.jwk" CopyToOutputDirectory="PreserveNewest" Condition="Exists('tempkey.jwk')" />
   </ItemGroup>
 
   <ItemGroup>
