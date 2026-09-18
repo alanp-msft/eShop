@@ -1,5 +1,7 @@
 ﻿namespace eShop.Ordering.API.Application.DomainEventHandlers;
 
+// REQ-005: converts OrderCancelledDomainEvent into OrderStatusChangedToCancelledIntegrationEvent and
+// persists it through the IntegrationEventLogEF outbox in the same transaction (ADR Option B1, unchanged).
 public partial class OrderCancelledDomainEventHandler
                 : INotificationHandler<OrderCancelledDomainEvent>
 {
