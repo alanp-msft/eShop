@@ -16,6 +16,9 @@ on:
       - 'tests/ClientApp.UnitTests/**'
       - '.github/workflows/pr-validation-maui.yml'
 
+permissions:
+  contents: read
+
 jobs:  
   test:
     runs-on: ubuntu-latest    

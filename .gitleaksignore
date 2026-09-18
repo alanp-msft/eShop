@@ -1,0 +1,7 @@
+# gitleaks fingerprints accepted as non-secrets (file:rule:line).
+# Reviewed with the pr gate security evidence; remove an entry when the line moves or the value changes.
+
+# Sample shared token for the WebhookClient demo; not a credential for any real service.
+# Both separator forms so the scan is clean on Linux runners and on Windows developer machines.
+src/WebhookClient/appsettings.json:generic-api-key:10
+src\WebhookClient\appsettings.json:generic-api-key:10
