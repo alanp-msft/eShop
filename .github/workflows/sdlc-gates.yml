@@ -91,9 +91,11 @@ jobs:
       - name: Secret scan (whole repository)
         shell: bash
         # Pin the image digest before enabling on a customer repository.
+        # Run from /repo with a relative source so finding fingerprints are repo-relative
+        # (path:rule:line) and match .gitleaksignore entries written from a local checkout.
         run: |
-          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 \
-            detect --source /repo --no-git --redact --exit-code 1
+          docker run --rm -v "$PWD:/repo" -w /repo ghcr.io/gitleaks/gitleaks:v8.21.2 \
+            detect --source . --no-git --redact --exit-code 1
 
       - name: Requirement trace
         if: steps.projects.outputs.list != ''
