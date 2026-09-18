@@ -134,6 +134,54 @@
     background: var(--color-success-tint);
 }
 
+.order-actions {
+    display: flex;
+    justify-content: flex-end;
+    text-align: right;
+}
+
+.orders-cancel-confirm {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--text-xs);
+    color: var(--color-ink-2);
+}
+
+.orders-cancel-confirm ::deep .button-danger {
+    border: 1px solid var(--color-danger);
+    background: var(--color-danger);
+    color: var(--color-surface);
+}
+
+.orders-cancel-confirm ::deep .button-danger:hover {
+    border-color: var(--color-danger-strong);
+    background: var(--color-danger-strong);
+}
+
+.orders-message {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0 0 1.5rem;
+    padding: 0.85rem 1.1rem;
+    border-radius: var(--radius-md, 0.5rem);
+    font-size: var(--text-sm);
+}
+
+.orders-message-success {
+    color: var(--color-success);
+    border: 1px solid var(--color-success);
+    background: var(--color-success-tint);
+}
+
+.orders-message-error {
+    color: var(--color-danger);
+    border: 1px solid var(--color-danger);
+    background: var(--color-danger-tint);
+}
+
 @media only screen and (max-width: 480px) {
     .orders-item {
         gap: 1rem;

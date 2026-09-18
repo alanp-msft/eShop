@@ -10,4 +10,8 @@ internal static partial class OrderingApiTrace
 
     [LoggerMessage(EventId = 3, EventName = "BuyerAndPaymentValidatedOrUpdated", Level = LogLevel.Trace, Message = "Buyer {BuyerId} and related payment method were validated or updated for order Id: {OrderId}.")]
     public static partial void LogOrderBuyerAndPaymentValidatedOrUpdated(ILogger logger, int buyerId, int orderId);
+
+    // REQ-008
+    [LoggerMessage(EventId = 4, EventName = "OrderCancelledByCustomer", Level = LogLevel.Information, Message = "Order {OrderId} was cancelled by customer identity {BuyerIdentity} at {CancelledAtUtc}")]
+    public static partial void LogOrderCancelledByCustomer(ILogger logger, int orderId, string buyerIdentity, DateTime cancelledAtUtc);
 }

@@ -10,8 +10,13 @@ public class IntegrationEventLogService<TContext> : IIntegrationEventLogService,
     public IntegrationEventLogService(TContext context)
     {
         _context = context;
-        _eventTypes = Assembly.Load(Assembly.GetEntryAssembly().FullName)
-            .GetTypes()
+        // The entry assembly is the test host under WebApplicationFactory, so event types must also
+        // come from the assembly that owns the DbContext and whatever else is already loaded.
+        _eventTypes = AppDomain.CurrentDomain.GetAssemblies()
+            .Prepend(typeof(TContext).Assembly)
+            .Prepend(Assembly.GetEntryAssembly()!)
+            .Distinct()
+            .SelectMany(a => { try { return a.GetTypes(); } catch (ReflectionTypeLoadException ex) { return ex.Types.Where(t => t is not null)!; } })
             .Where(t => t.Name.EndsWith(nameof(IntegrationEvent)))
             .ToArray();
     }
@@ -25,10 +30,17 @@ public class IntegrationEventLogService<TContext> : IIntegrationEventLogService,
         if (result.Count != 0)
         {
             return result.OrderBy(o => o.CreationTime)
-                .Select(e => e.DeserializeJsonContent(_eventTypes.FirstOrDefault(t => t.Name == e.EventTypeShortName)));
+                .Select(e => e.DeserializeJsonContent(ResolveEventType(e)));
         }
 
         return [];
+    }
+
+    private Type ResolveEventType(IntegrationEventLogEntry entry)
+    {
+        return _eventTypes.FirstOrDefault(t => t.FullName == entry.EventTypeName)
+            ?? _eventTypes.FirstOrDefault(t => t.Name == entry.EventTypeShortName)
+            ?? throw new InvalidOperationException($"Integration event type '{entry.EventTypeName}' is not loaded; outbox entry {entry.EventId} cannot be published.");
     }
 
     public Task SaveEventAsync(IntegrationEvent @event, IDbContextTransaction transaction)

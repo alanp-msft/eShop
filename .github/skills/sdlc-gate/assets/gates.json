@@ -1,0 +1,65 @@
+{
+  "description": "Gate definitions by risk tier. Paths are globs relative to the repository root; {project} is replaced with the project slug.",
+  "tiers": {
+    "low": ["pr", "release"],
+    "medium": ["design", "plan", "pr", "release"],
+    "high": ["design", "plan", "pr", "release", "production"]
+  },
+  "gates": {
+    "design": {
+      "purpose": "Architecture and risk posture agreed before implementation planning",
+      "approver_role": "Tech lead or architect",
+      "required": [
+        { "artifact": "charter", "glob": ".copilot-tracking/sdlc/{project}/charter.md" },
+        { "artifact": "requirements", "glob": ".copilot-tracking/sdlc/{project}/requirements.md" },
+        { "artifact": "adr", "glob": "docs/decisions/*.md" }
+      ],
+      "required_when": [
+        { "condition": "risk_tier in [medium, high]", "artifact": "security-plan", "glob": ".copilot-tracking/security-plans/{project}/security-plan-*.md" },
+        { "condition": "risk_tier in [medium, high]", "artifact": "requirement-workitems", "glob": ".copilot-tracking/sdlc/{project}/evidence/workitems-*.md", "frontmatter": { "status": "synced" } },
+        { "condition": "ai_components == true", "artifact": "rai-plan", "glob": ".copilot-tracking/rai-plans/{project}/rai-plan.md" }
+      ]
+    },
+    "plan": {
+      "purpose": "Scope, phase order, and test strategy agreed before implementation consumes budget; the AI critique informs the decision but does not make it",
+      "approver_role": "Tech lead",
+      "required": [
+        { "artifact": "design-gate", "glob": ".copilot-tracking/sdlc/{project}/gates/design.json" },
+        { "artifact": "plan", "glob": ".copilot-tracking/plans/*/*-plan.md" },
+        { "artifact": "plan-critique", "glob": ".copilot-tracking/reviews/plans/*/*-critique.md", "content": "^## Disposition:\\s*\\**(Approve|Approved|Pass)\\**\\s*$" }
+      ]
+    },
+    "pr": {
+      "purpose": "Implementation is traceable, tested, and reviewed before merge",
+      "approver_role": "Code reviewer",
+      "required": [
+        { "artifact": "plan", "glob": ".copilot-tracking/plans/*/*-plan.md" },
+        { "artifact": "changes", "glob": ".copilot-tracking/changes/*/*-changes.md" },
+        { "artifact": "test-evidence", "glob": ".copilot-tracking/sdlc/{project}/evidence/tests-*.md" },
+        { "artifact": "code-review", "glob": ".copilot-tracking/reviews/code-reviews/*/review.md" },
+        { "artifact": "requirement-trace", "glob": ".copilot-tracking/sdlc/{project}/evidence/trace-*.md" }
+      ],
+      "required_when": [
+        { "condition": "risk_tier in [medium, high]", "artifact": "security-scan", "glob": ".copilot-tracking/sdlc/{project}/evidence/security-*.md", "frontmatter": { "status": "pass" } }
+      ]
+    },
+    "release": {
+      "purpose": "Release is documented, reversible, and scanned",
+      "approver_role": "Release manager",
+      "required": [
+        { "artifact": "release-manifest", "glob": ".copilot-tracking/sdlc/{project}/release/manifest-*.json" },
+        { "artifact": "release-notes", "glob": ".copilot-tracking/sdlc/{project}/release/release-notes-*.md" },
+        { "artifact": "rollback-plan", "glob": ".copilot-tracking/sdlc/{project}/release/rollback-*.md", "frontmatter": { "status": "ready" } },
+        { "artifact": "pr-gate", "glob": ".copilot-tracking/sdlc/{project}/gates/pr.json" }
+      ]
+    },
+    "production": {
+      "purpose": "Explicit business and operations sign-off for high-tier systems",
+      "approver_role": "Sponsor and operations owner",
+      "required": [
+        { "artifact": "release-gate", "glob": ".copilot-tracking/sdlc/{project}/gates/release.json" },
+        { "artifact": "runbook", "glob": ".copilot-tracking/sdlc/{project}/release/runbook-*.md" }
+      ]
+    }
+  }
+}

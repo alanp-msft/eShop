@@ -1,0 +1,26 @@
+[
+  {
+    "rule": "CKV_OPENAPI_4",
+    "path": "src/Catalog.API/",
+    "justification": "Checked-in OpenAPI documents are generated from Catalog.API at build time; authentication is enforced by the gateway and endpoint policies, not by the exported spec. Pre-existing upstream eShop content outside the order-cancellation change.",
+    "approved_by": "alanp-msft",
+    "expires": "2026-12-17",
+    "work_item": "Follow-up: regenerate or remove the committed Catalog.API OpenAPI JSON files"
+  },
+  {
+    "rule": "CKV_OPENAPI_5",
+    "path": "src/Catalog.API/",
+    "justification": "Checked-in OpenAPI documents are generated from Catalog.API at build time; per-operation security is enforced by endpoint authorization policies, not by the exported spec. Pre-existing upstream eShop content outside the order-cancellation change.",
+    "approved_by": "alanp-msft",
+    "expires": "2026-12-17",
+    "work_item": "Follow-up: regenerate or remove the committed Catalog.API OpenAPI JSON files"
+  },
+  {
+    "rule": "CKV_OPENAPI_21",
+    "path": "src/Catalog.API/",
+    "justification": "Array maxItems in the generated Catalog.API OpenAPI documents is a documentation-only constraint; request size limits are enforced by Kestrel and the API's paging parameters. Pre-existing upstream eShop content outside the order-cancellation change.",
+    "approved_by": "alanp-msft",
+    "expires": "2026-12-17",
+    "work_item": "Follow-up: regenerate or remove the committed Catalog.API OpenAPI JSON files"
+  }
+]

@@ -1,0 +1,42 @@
+{
+  "project": "order-cancellation",
+  "gate": "pr",
+  "decision": "approved",
+  "approved_by": "alanp-msft",
+  "approved_at": "2026-09-18T16:23:23+00:00",
+  "conditions": [],
+  "evidence": [
+    {
+      "artifact": "plan",
+      "path": ".copilot-tracking/plans/2026-09-16/order-cancellation-plan.md",
+      "sha256": "be5896232e9c8fbc06baaf1fde2c1a41ad0a61dda94731701408733687c412eb"
+    },
+    {
+      "artifact": "changes",
+      "path": ".copilot-tracking/changes/2026-09-16/order-cancellation-changes.md",
+      "sha256": "2f67acaa87c24f9f79e2dad4d00da7049b30475a264b15eee8d4a930b87d197d"
+    },
+    {
+      "artifact": "test-evidence",
+      "path": ".copilot-tracking/sdlc/order-cancellation/evidence/tests-2026-09-17.md",
+      "sha256": "9869180cf5c838667c3f996992c211e923d8daa80d1ed450bfd44a7d4cc25462"
+    },
+    {
+      "artifact": "requirement-trace",
+      "path": ".copilot-tracking/sdlc/order-cancellation/evidence/trace-2026-09-18.md",
+      "sha256": "61d33b9c4c4e97688a5e5a24b1dfcf1391f4cf93dd2bfcebf25d25651369ca01"
+    },
+    {
+      "artifact": "security-scan",
+      "path": ".copilot-tracking/sdlc/order-cancellation/evidence/security-2026-09-18.md",
+      "sha256": "e630b0d0606f817f8498a26abfe9ac4dd57ec7b9d88f9133b8ff3993fa0d7c41"
+    },
+    {
+      "artifact": "code-review",
+      "path": ".copilot-tracking/reviews/code-reviews/order-cancellation/review.md",
+      "sha256": "eaf56d35af627549fdfeeb606de339225c2407c391565441efab92fcdc782966"
+    }
+  ],
+  "session_id": "73788051bb78",
+  "notes": "Approved on feature/order-cancellation at a622b25 (PR #10). CI: pr-validation run 35367336261 green (Ordering.FunctionalTests 16/16, RV-001 satisfied); SDLC Gates run 35367336124 green (CodeQL 0 blocking, 6 checkov OpenAPI findings under governed suppressions expiring 2026-12-17). RV-003 carried as a note: the ADR stays 'proposed' in bytes because its hash is bound into the approved design record; treated as accepted. Decisions carried: A1 (REQ-004 under no pre-Paid reservation), A4 (409 for ineligible status), A5 (audit via LoggerMessage EventId 4). Known limitations: REQ-009 succeeded counter increments before commit; REQ-006 banner persistence open with ux-owner; REQ-002 401 path enforced by RequireAuthorization only."
+}

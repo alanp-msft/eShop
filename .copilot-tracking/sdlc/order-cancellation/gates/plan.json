@@ -1,0 +1,27 @@
+{
+  "project": "order-cancellation",
+  "gate": "plan",
+  "decision": "approved",
+  "approved_by": "alanp-msft",
+  "approved_at": "2026-09-16T23:15:12+00:00",
+  "conditions": [],
+  "evidence": [
+    {
+      "artifact": "plan",
+      "path": ".copilot-tracking/plans/2026-09-16/order-cancellation-plan.md",
+      "sha256": "12e3fbbc3765acc3f5f2fb5f075b3e862c375b3cd8c85db000056d56abe76760"
+    },
+    {
+      "artifact": "plan-critique",
+      "path": ".copilot-tracking/reviews/plans/2026-09-16/order-cancellation-plan-critique.md",
+      "sha256": "08347557ae9d922ff1cfc317ae8254c5a4a56549427fa2a9170158cfb20e33a1"
+    },
+    {
+      "artifact": "design-gate",
+      "path": ".copilot-tracking/sdlc/order-cancellation/gates/design.json",
+      "sha256": "687d6930775e0e9ff87fa810c991b647cae8262a4d3e4eec25d0a0bcf3176686"
+    }
+  ],
+  "session_id": "32e8dfaf5be7",
+  "notes": "Re-approval after plan P03/P07/P08 amendment for the 404 mapping. Supersedes the record from session d7d451681c2c."
+}

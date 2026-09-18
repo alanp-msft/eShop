@@ -496,3 +496,17 @@ $RECYCLE.BIN/
 /playwright/.auth/
 /user.json
 .azure
+
+# hve4isd: durable lifecycle evidence is versioned; scratch, sessions, and the audit store are not.
+.copilot-tracking/*
+!.copilot-tracking/sdlc/
+!.copilot-tracking/plans/
+!.copilot-tracking/changes/
+!.copilot-tracking/reviews/
+.copilot-tracking/sdlc/*/audit/
+.copilot-tracking/eval/
+
+# hve4isd: durable lifecycle evidence is versioned; scratch, sessions, and the audit store are not.
+!.copilot-tracking/security-plans/
+!.copilot-tracking/rai-plans/
+!.copilot-tracking/sssc-plans/

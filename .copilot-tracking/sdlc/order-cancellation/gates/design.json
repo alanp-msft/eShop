@@ -1,0 +1,37 @@
+{
+  "project": "order-cancellation",
+  "gate": "design",
+  "decision": "approved",
+  "approved_by": "alanp-msft",
+  "approved_at": "2026-09-16T23:15:11+00:00",
+  "conditions": [],
+  "evidence": [
+    {
+      "artifact": "charter",
+      "path": ".copilot-tracking/sdlc/order-cancellation/charter.md",
+      "sha256": "a2c96aa3f1a9550bb0dd5efc9083f9e585a62ae5426f13c7d5178e106cb61803"
+    },
+    {
+      "artifact": "requirements",
+      "path": ".copilot-tracking/sdlc/order-cancellation/requirements.md",
+      "sha256": "0cd3142066bbef3c690532667172a6ee9e81355a373fc32d3d35b7d025d61850"
+    },
+    {
+      "artifact": "adr",
+      "path": "docs/decisions/2026-09-15-order-cancellation-authorization-and-events.md",
+      "sha256": "d053e46fe716743a5fd35a13969613e35673c2876581785942c27a37eb9d313e"
+    },
+    {
+      "artifact": "security-plan",
+      "path": ".copilot-tracking/security-plans/order-cancellation/security-plan-order-cancellation.md",
+      "sha256": "e1db54ec7b9481869f2da7de44a914599510f7eaf5011c472865e6f2d50623b9"
+    },
+    {
+      "artifact": "workitems",
+      "path": ".copilot-tracking/sdlc/order-cancellation/evidence/workitems-2026-09-16.md",
+      "sha256": "bdc801d056c1bff2aa011e51bb2c8c67c47b4154bc3dc5615ac5fbcffe42e787"
+    }
+  ],
+  "session_id": "32e8dfaf5be7",
+  "notes": "Re-approval after ADR amendment: Forbidden maps to 404 (T-ORDERINGAPI-006). Supersedes the 2026-09-16 record from session 327eafc13c45."
+}

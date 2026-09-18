@@ -29,7 +29,7 @@ public static class OrdersApi
             return TypedResults.BadRequest("Empty GUID is not valid for request ID");
         }
 
-        var requestCancelOrder = new IdentifiedCommand<CancelOrderCommand, bool>(command, requestId);
+        var requestCancelOrder = new IdentifiedCommand<CancelOrderCommand, CancelOrderResult>(command, requestId);
 
         services.Logger.LogInformation(
             "Sending command: {CommandName} - {IdProperty}: {CommandId} ({@Command})",
@@ -40,12 +40,20 @@ public static class OrdersApi
 
         var commandResult = await services.Mediator.Send(requestCancelOrder);
 
-        if (!commandResult)
+        // REQ-001, REQ-002, REQ-007, REQ-009
+        return commandResult switch
         {
-            return TypedResults.Problem(detail: "Cancel order failed to process.", statusCode: 500);
-        }
-
-        return TypedResults.Ok();
+            CancelOrderResult.Success or CancelOrderResult.AlreadyCancelled => TypedResults.Ok(),
+            // REQ-002: Forbidden maps to the same 404 body as NotFound (ADR amendment 2026-09-16,
+            // T-ORDERINGAPI-006) so a non-owner cannot distinguish "not yours" from "doesn't exist".
+            CancelOrderResult.NotFound or CancelOrderResult.Forbidden =>
+                TypedResults.Problem(detail: "Order not found.", statusCode: 404),
+            CancelOrderResult.IneligibleStatus =>
+                TypedResults.Problem(detail: "Order cannot be cancelled in its current status.", statusCode: 409),
+            // REQ-009: Unknown/unmatched (including the swallowed-exception default) must not be
+            // reported as 404 Not Found; keep the 500 fallback for defense-in-depth.
+            _ => TypedResults.Problem(detail: "Cancel order failed to process.", statusCode: 500),
+        };
     }
 
     public static async Task<Results<Ok, BadRequest<string>, ProblemHttpResult>> ShipOrderAsync(

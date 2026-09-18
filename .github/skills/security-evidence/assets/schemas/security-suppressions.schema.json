@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hve4isd/schemas/security-suppressions.schema.json",
+  "title": "Security Finding Suppressions",
+  "description": "Governed list of scanner findings accepted as false positives or accepted risk. Lives at .copilot-tracking/sdlc/{project}/security-suppressions.json and is owned by the security approver group in CODEOWNERS.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["rule", "justification", "approved_by", "expires"],
+    "properties": {
+      "rule": { "type": "string", "description": "SARIF ruleId, for example cs/sql-injection" },
+      "path": { "type": "string", "description": "Optional path prefix; omit to suppress the rule everywhere" },
+      "justification": { "type": "string", "minLength": 20 },
+      "approved_by": { "type": "string" },
+      "expires": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+      "work_item": { "type": "string", "description": "Tracker reference when the finding is accepted risk with remediation planned" }
+    }
+  }
+}

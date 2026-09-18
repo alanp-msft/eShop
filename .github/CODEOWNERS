@@ -1,0 +1,36 @@
+# Replace the placeholder teams with the customer's groups before enabling.
+# Pair with branch protection: "Require review from Code Owners" on main and release/*.
+# Azure DevOps equivalent: Branch policy > Automatically included reviewers with a path filter,
+# marked Required, for each path below.
+
+# Gate approval records may only be merged with sign-off from the approver group.
+/.copilot-tracking/sdlc/*/gates/design.json      @{{org}}/architecture-leads
+/.copilot-tracking/sdlc/*/gates/plan.json        @{{org}}/tech-leads
+/.copilot-tracking/sdlc/*/gates/pr.json          @{{org}}/code-reviewers
+/.copilot-tracking/sdlc/*/gates/release.json     @{{org}}/release-managers
+/.copilot-tracking/sdlc/*/gates/production.json  @{{org}}/release-managers @{{org}}/sponsors
+
+# Release manifests bind a version to its approvals; rollback plans are the release manager's.
+/.copilot-tracking/sdlc/*/release/                @{{org}}/release-managers
+
+# Changing what a gate requires is itself a governance decision.
+/.github/skills/sdlc-gate/assets/        @{{org}}/architecture-leads
+
+# Accepting a scanner finding is a security decision; thresholds and suppressions need the security group.
+/.github/skills/security-evidence/assets/         @{{org}}/security-champions
+/.copilot-tracking/sdlc/*/security-suppressions.json @{{org}}/security-champions
+
+# The overlay's agents, prompts, and instructions shape every session; treat as code.
+/.github/agents/                          @{{org}}/hve4isd-maintainers
+/.github/prompts/                         @{{org}}/hve4isd-maintainers
+/.github/instructions/hve4isd/                    @{{org}}/hve4isd-maintainers
+/.github/skills/                          @{{org}}/hve4isd-maintainers
+
+# CI that enforces the gates must not be weakened without review.
+/.github/workflows/sdlc-gates.yml                 @{{org}}/hve4isd-maintainers @{{org}}/release-managers
+/azure-pipelines/sdlc-gates.yml                   @{{org}}/hve4isd-maintainers @{{org}}/release-managers
+/.github/CODEOWNERS                               @{{org}}/hve4isd-maintainers
+
+# The upstream pin and its snapshot decide which HVE Core agents the overlay may rely on.
+/plugin.json                                      @{{org}}/hve4isd-maintainers
+/upstream/                                        @{{org}}/hve4isd-maintainers

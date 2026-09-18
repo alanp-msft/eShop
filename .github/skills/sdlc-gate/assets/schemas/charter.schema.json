@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hve4isd/schemas/charter.schema.json",
+  "title": "SDLC Charter Frontmatter",
+  "type": "object",
+  "required": ["project", "title", "sponsor", "risk_tier", "data_classification", "platforms", "status", "created"],
+  "properties": {
+    "project": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "title": { "type": "string" },
+    "sponsor": { "type": "string" },
+    "risk_tier": { "type": "string", "enum": ["low", "medium", "high"] },
+    "data_classification": { "type": "string", "enum": ["public", "internal", "confidential", "restricted"] },
+    "ai_components": { "type": "boolean" },
+    "platforms": {
+      "type": "object",
+      "required": ["tracker", "repo_host"],
+      "properties": {
+        "tracker": { "type": "string", "enum": ["ado", "github"] },
+        "repo_host": { "type": "string", "enum": ["ado", "github"] },
+        "tracker_project": { "type": "string" },
+        "area_path": { "type": "string" },
+        "tracker_org": { "type": "string", "description": "Azure DevOps organization URL, for example https://dev.azure.com/contoso" },
+        "tracker_repo": { "type": "string", "description": "GitHub owner/name when the tracker is GitHub Issues" }
+      }
+    },
+    "stack": { "type": "array", "items": { "type": "string" } },
+    "status": { "type": "string", "enum": ["draft", "approved", "active", "closed"] },
+    "created": { "type": "string" }
+  }
+}

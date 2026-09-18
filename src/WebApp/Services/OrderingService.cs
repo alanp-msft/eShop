@@ -16,6 +16,15 @@ public class OrderingService(HttpClient httpClient)
         requestMessage.Content = JsonContent.Create(request);
         return httpClient.SendAsync(requestMessage);
     }
+
+    // REQ-006
+    public Task<HttpResponseMessage> CancelOrder(int orderNumber, Guid requestId)
+    {
+        var requestMessage = new HttpRequestMessage(HttpMethod.Put, remoteServiceBaseUrl + "cancel");
+        requestMessage.Headers.Add("x-requestid", requestId.ToString());
+        requestMessage.Content = JsonContent.Create(new { orderNumber });
+        return httpClient.SendAsync(requestMessage);
+    }
 }
 
 public record OrderRecord(

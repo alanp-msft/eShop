@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hve4isd/schemas/sdlc-state.schema.json",
+  "title": "SDLC Project State",
+  "type": "object",
+  "required": ["project", "stage", "risk_tier", "updated_at"],
+  "properties": {
+    "project": { "type": "string" },
+    "stage": { "type": "string", "enum": ["intake", "discovery", "architecture", "plan", "implement", "verify", "release", "operate", "learn"] },
+    "risk_tier": { "type": "string", "enum": ["low", "medium", "high"] },
+    "gates": {
+      "type": "object",
+      "properties": {
+        "design": { "type": "string", "enum": ["not_required", "pending", "approved", "rejected"] },
+        "plan": { "type": "string", "enum": ["not_required", "pending", "approved", "rejected"] },
+        "pr": { "type": "string", "enum": ["not_required", "pending", "approved", "rejected"] },
+        "release": { "type": "string", "enum": ["not_required", "pending", "approved", "rejected"] },
+        "production": { "type": "string", "enum": ["not_required", "pending", "approved", "rejected"] }
+      }
+    },
+    "active_task_ids": { "type": "array", "items": { "type": "string" } },
+    "updated_at": { "type": "string" }
+  }
+}

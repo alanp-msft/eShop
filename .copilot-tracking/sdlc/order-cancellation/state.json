@@ -1,0 +1,14 @@
+{
+  "project": "order-cancellation",
+  "stage": "release",
+  "risk_tier": "medium",
+  "gates": {
+    "design": "approved",
+    "plan": "approved",
+    "pr": "approved",
+    "release": "pending",
+    "production": "not_required"
+  },
+  "active_task_ids": [],
+  "updated_at": "2026-09-18T16:24:17+00:00"
+}

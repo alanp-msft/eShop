@@ -39,6 +39,49 @@ public class OrderBuilder
         return this;
     }
 
+    public OrderBuilder WithStatus(OrderStatus targetStatus)
+    {
+        // Drive the aggregate through its existing Set*Status() methods to reach
+        // the target status realistically, rather than reflecting into the private setter.
+        if (targetStatus == OrderStatus.Submitted)
+        {
+            return this;
+        }
+
+        order.SetAwaitingValidationStatus();
+        if (targetStatus == OrderStatus.AwaitingValidation)
+        {
+            return this;
+        }
+
+        if (targetStatus == OrderStatus.Cancelled)
+        {
+            // Cancel from AwaitingValidation, the last status still eligible for cancellation.
+            order.SetCancelledStatus();
+            return this;
+        }
+
+        order.SetStockConfirmedStatus();
+        if (targetStatus == OrderStatus.StockConfirmed)
+        {
+            return this;
+        }
+
+        order.SetPaidStatus();
+        if (targetStatus == OrderStatus.Paid)
+        {
+            return this;
+        }
+
+        if (targetStatus == OrderStatus.Shipped)
+        {
+            order.SetShippedStatus();
+            return this;
+        }
+
+        throw new ArgumentOutOfRangeException(nameof(targetStatus), targetStatus, "Unsupported target order status.");
+    }
+
     public Order Build()
     {
         return order;
