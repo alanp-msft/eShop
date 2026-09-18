@@ -320,10 +320,10 @@ This phase is no longer a separate implementation task. The prior circular seque
 
 ---
 
-### P08: End-to-end functional coverage (REQ-005, REQ-007, cross-cutting REQ-002)
+### P08: End-to-end functional coverage (REQ-005, REQ-007, cross-cutting REQ-002) — ✅ Complete (2026-09-17)
 <!-- parallelizable: false -->
 
-#### P08-T01: Functional tests for ownership, idempotency, and event-publish outcomes
+#### P08-T01: Functional tests for ownership, idempotency, and event-publish outcomes — ✅ Complete
 
 **Goals**: Exercise the full `Ordering.API` pipeline (routing → `IdentifiedCommand` → handler → repository → outbox) via `WebApplicationFactory`, covering the scenarios that unit tests with mocked repositories cannot fully prove: real ownership mismatch against a seeded buyer, real duplicate-request-id idempotency, real already-cancelled idempotency, and real `IntegrationEventLogEF` outbox writes.
 

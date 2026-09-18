@@ -23,8 +23,10 @@
       "tests\\Basket.FunctionalTests\\Basket.FunctionalTests.csproj",
       "tests\\Application.UnitTests\\Application.UnitTests.csproj",
       "tests\\Catalog.FunctionalTests\\Catalog.FunctionalTests.csproj",
+      "tests\\Catalog.UnitTests\\Catalog.UnitTests.csproj",
       "tests\\Ordering.FunctionalTests\\Ordering.FunctionalTests.csproj",
       "tests\\Ordering.UnitTests\\Ordering.UnitTests.csproj",
+      "tests\\WebApp.UnitTests\\WebApp.UnitTests.csproj",
       "tests\\Webhooks.FunctionalTests\\Webhooks.FunctionalTests.csproj",
       "tests\\eShop.AppHost.UnitTests\\eShop.AppHost.UnitTests.csproj"
     ]
