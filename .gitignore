@@ -505,6 +505,8 @@ $RECYCLE.BIN/
 !.copilot-tracking/reviews/
 .copilot-tracking/sdlc/*/audit/
 .copilot-tracking/eval/
+# The .NET template's [Rr]elease/ rule would otherwise hide release manifests.
+!.copilot-tracking/sdlc/*/release/
 
 # hve4isd: durable lifecycle evidence is versioned; scratch, sessions, and the audit store are not.
 !.copilot-tracking/security-plans/

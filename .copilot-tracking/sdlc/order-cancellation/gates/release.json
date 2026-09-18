@@ -1,0 +1,32 @@
+{
+  "project": "order-cancellation",
+  "gate": "release",
+  "decision": "approved",
+  "approved_by": "alanp-msft",
+  "approved_at": "2026-09-18T19:17:45+00:00",
+  "conditions": [],
+  "evidence": [
+    {
+      "artifact": "release-manifest",
+      "path": ".copilot-tracking/sdlc/order-cancellation/release/manifest-1.0.0.json",
+      "sha256": "ceb0ff238f42e4ba128da07d95cf55c54d7f741e7ba0927ad7be128aab6e4442"
+    },
+    {
+      "artifact": "release-notes",
+      "path": ".copilot-tracking/sdlc/order-cancellation/release/release-notes-1.0.0.md",
+      "sha256": "50c2976ad443e9249a95a4d1d6f79a7c5bbf10e91e98b85e46609cff7fa1638a"
+    },
+    {
+      "artifact": "rollback-plan",
+      "path": ".copilot-tracking/sdlc/order-cancellation/release/rollback-1.0.0.md",
+      "sha256": "b4a6ab12e71e9e2a70cc07451ef2ca132757e69f8feb4fc6ff09b6453b6f00b4"
+    },
+    {
+      "artifact": "pr-gate",
+      "path": ".copilot-tracking/sdlc/order-cancellation/gates/pr.json",
+      "sha256": "83e14b932fef76c7f862cfa1ce630a50e1fd346294c564982e42d3e7e7de6f9f"
+    }
+  ],
+  "session_id": "3eb46d3ca2f1",
+  "notes": "Release 1.0.0 of order-cancellation from merge commit 0a2a9f9 on main. Manifest complete (design, plan, pr records; test, trace, security, work-item evidence; all nine requirements traced). Rollback plan reviewed and marked ready by the release manager: code-only revert, no schema or configuration reversal. Known items carried from the pr gate are listed in the release notes. Plan-gate approval record reads stale because the plan received completion marks after approval; design and pr approvals verify clean."
+}
