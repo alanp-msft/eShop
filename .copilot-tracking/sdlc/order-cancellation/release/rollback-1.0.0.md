@@ -3,7 +3,8 @@ title: Rollback plan order-cancellation 1.0.0
 description: Steps to return order-cancellation to the previous release if 1.0.0 must be withdrawn
 ms.date: 2026-09-18
 version: 1.0.0
-status: draft
+status: ready
+reviewed_by: alanp-msft
 ---
 
 ## Trigger
